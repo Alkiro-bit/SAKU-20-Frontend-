@@ -1,0 +1,60 @@
+import { createRouter, createWebHistory } from 'vue-router';
+import HomeView from '@/views/public/HomeView.vue';
+import ShopView from '@/views/public/ShopView.vue';
+
+const routes = [
+  {
+    path: '/',
+    name: 'home',
+    component: HomeView,
+  },
+  {
+    path: '/stores',
+    name: 'stores',
+    component: ShopView,
+  },
+  {
+    path: '/cart',
+    name: 'cart',
+    component: HomeView, // placeholder
+  },
+  {
+    path: '/history',
+    name: 'history',
+    component: HomeView, // placeholder
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: HomeView, // placeholder
+    meta: { guestOnly: true },
+  },
+];
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+});
+
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('auth_token');
+  const user = JSON.parse(localStorage.getItem('user_data') || 'null');
+  const userRole = user?.role;
+
+  if (to.meta.requiresAuth && !token) {
+    return next({ path: '/login', query: { redirect: to.fullPath } });
+  }
+
+  if (to.meta.role && to.meta.role !== userRole) {
+    return next({ path: '/' });
+  }
+
+  if (to.meta.guestOnly && token) {
+    return next({ path: '/' });
+  }
+
+  next();
+});
+
+export default router;
