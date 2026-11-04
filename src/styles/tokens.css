@@ -1,0 +1,71 @@
+/* ===========================================================
+   SAKU 20 — Design Tokens
+   Sumber: Figma. Isi ulang di sini jika ada perubahan desain —
+   jangan hardcode hex code langsung di komponen manapun.
+   =========================================================== */
+
+:root {
+  /* --- Warna Brand --- */
+  --color-primary: #0095FF;          /* logo, CTA, check, active nav/pill */
+  --color-primary-hover: #007ACC;    /* placeholder: ~15% lebih gelap, cek ke Figma kalau ada varian hover eksplisit */
+
+  /* --- Warna Aksen TEFA --- */
+  --color-tefa-accent: #FF0000;      /* active filter pill & active nav khusus halaman TEFA */
+  /* CATATAN: nilai ini sama persis dengan --color-status-dibatalkan di bawah.
+     Perlu dikonfirmasi apakah ini disengaja — lihat penjelasan di chat. */
+
+  /* --- Warna Teks --- */
+  --color-text: #000000;             /* teks utama */
+  --color-text-muted: #969696;       /* unactive nav, unactive font, stroke */
+  --color-text-on-accent: #FFFFFF;   /* teks di atas --color-primary atau --color-tefa-accent */
+
+  /* --- Warna Status Pesanan (mapping ke enum backend) --- */
+  --color-status-diproses-bg: #FFD900;      /* "Pending" di Figma */
+  --color-status-diproses-text: #000000;    /* kontras cukup di atas kuning terang */
+
+  --color-status-siap_diambil-bg: #00D707;  /* "Ready" di Figma */
+  --color-status-siap_diambil-text: #000000;
+
+  --color-status-selesai-bg: #969696;       /* "Completed" di Figma */
+  --color-status-selesai-text: #FFFFFF;
+
+  --color-status-dibatalkan-bg: #FF0000;    /* "Canceled" di Figma */
+  --color-status-dibatalkan-text: #FFFFFF;
+
+  /* --- Latar & Stroke --- */
+  --color-background: #FFFFFF;
+  --color-surface: #FFFFFF;          /* sama dengan background untuk saat ini; pisahkan kalau nanti card punya warna beda */
+  --color-border: #969696;
+
+  /* --- Tipografi --- */
+  --font-family-brand: 'Poppins', sans-serif;            /* brand, navigation, CTA */
+  --font-family-base: 'Plus Jakarta Sans', sans-serif;    /* teks umum di dalam screen */
+
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 15px;
+  --font-size-lg: 18px;
+  --font-size-xl: 22px;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  /* --- Spacing (unit dasar 10px) --- */
+  --space-1: 10px;
+  --space-2: 20px;
+  --space-3: 30px;
+  --space-4: 40px;
+  --space-5: 60px;
+  /* Tambahkan step lain di sini kalau Figma butuh nilai di luar skala ini,
+     tapi usahakan tetap kelipatan 10 supaya konsisten. */
+
+  /* --- Border Radius --- */
+  --radius-md: 6px;
+
+  /* --- Shadow --- */
+  --shadow-md: 0px 4px 10px 0px rgba(0, 0, 0, 0.25);
+
+  /* --- Transisi --- */
+  --transition-fast: 150ms ease;     /* hover state, buka/tutup modal, dsb — belum ada di Figma, nilai standar */
+}
