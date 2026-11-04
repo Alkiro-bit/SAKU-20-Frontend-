@@ -19,18 +19,12 @@
   --color-text-muted: #969696;       /* unactive nav, unactive font, stroke */
   --color-text-on-accent: #FFFFFF;   /* teks di atas --color-primary atau --color-tefa-accent */
 
-  /* --- Warna Status Pesanan (mapping ke enum backend) --- */
-  --color-status-diproses-bg: #FFD900;      /* "Pending" di Figma */
-  --color-status-diproses-text: #000000;    /* kontras cukup di atas kuning terang */
-
-  --color-status-siap_diambil-bg: #00D707;  /* "Ready" di Figma */
-  --color-status-siap_diambil-text: #000000;
-
-  --color-status-selesai-bg: #969696;       /* "Completed" di Figma */
-  --color-status-selesai-text: #FFFFFF;
-
-  --color-status-dibatalkan-bg: #FF0000;    /* "Canceled" di Figma */
-  --color-status-dibatalkan-text: #FFFFFF;
+  /* --- Warna Status Pesanan (mapping ke enum backend) ---
+     Figma node 835:226 — badge: bg = warna 20%, border & teks = warna penuh. */
+  --color-status-diproses: #FFD900;         /* "Pending" */
+  --color-status-siap_diambil: #00D707;     /* "Ready" */
+  --color-status-selesai: #969696;          /* "Completed" */
+  --color-status-dibatalkan: #FF0000;       /* "Canceled" */
 
   /* --- Latar & Stroke --- */
   --color-background: #FFFFFF;
