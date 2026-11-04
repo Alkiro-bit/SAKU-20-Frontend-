@@ -10,7 +10,7 @@ const tabs = [
   { name: 'Shop', path: '/stores', icon: 'material-symbols:menu-book-2' },
   { name: 'TEFA', path: '/tefa', icon: 'entypo:shop', isTefa: true },
   { name: 'Cart', path: '/cart', icon: 'boxicons:cart-filled' },
-  { name: 'History', path: '/history', icon: 'boxicons:receipt-filled' },
+  { name: 'Orders', path: '/orders', icon: 'boxicons:receipt-filled' },
 ];
 
 function isActive(tab) {

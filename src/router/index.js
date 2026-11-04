@@ -3,6 +3,7 @@ import HomeView from '@/views/public/HomeView.vue';
 import ShopView from '@/views/public/ShopView.vue';
 import TefaView from '@/views/public/TefaView.vue';
 import CartView from '@/views/public/CartView.vue';
+import OrdersView from '@/views/public/OrdersView.vue';
 
 const routes = [
   {
@@ -26,10 +27,13 @@ const routes = [
     component: CartView,
   },
   {
+    path: '/orders',
+    name: 'orders',
+    component: OrdersView,
+  },
+  {
     path: '/history',
-    name: 'history',
-    component: HomeView, // placeholder
-    meta: { requiresAuth: true },
+    redirect: '/orders',
   },
   {
     path: '/login',
