@@ -20,7 +20,15 @@ function handleProfileClick() {
 <template>
   <header class="mobile-header">
     <router-link to="/" class="logo">SAKU 20</router-link>
-    <button class="profile-btn" @click="handleProfileClick" aria-label="Profil Akun">
+    <router-link v-if="!authStore.isAuthenticated" to="/login" class="login-cta">
+      Login
+    </router-link>
+    <button
+      v-else
+      class="profile-btn"
+      @click="handleProfileClick"
+      aria-label="Profil Akun"
+    >
       <Icon icon="ix:user-profile-filled" width="36" height="36" class="profile-icon" />
     </button>
   </header>
@@ -61,5 +69,31 @@ function handleProfileClick() {
 
 .profile-icon {
   color: var(--color-text);
+}
+
+.login-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 29px;
+  padding: 6px 30px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-primary);
+  color: var(--color-text-on-accent);
+  font-family: var(--font-family-brand);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: normal;
+  transition: background-color var(--transition-fast);
+}
+
+.login-cta:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.login-cta:focus-visible,
+.profile-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
 }
 </style>

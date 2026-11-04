@@ -4,6 +4,8 @@ import ShopView from '@/views/public/ShopView.vue';
 import TefaView from '@/views/public/TefaView.vue';
 import CartView from '@/views/public/CartView.vue';
 import OrdersView from '@/views/public/OrdersView.vue';
+import LoginView from '@/views/auth/LoginView.vue';
+import RegisterView from '@/views/auth/RegisterView.vue';
 
 const routes = [
   {
@@ -38,7 +40,13 @@ const routes = [
   {
     path: '/login',
     name: 'login',
-    component: HomeView, // placeholder
+    component: LoginView,
+    meta: { guestOnly: true },
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: RegisterView,
     meta: { guestOnly: true },
   },
 ];
