@@ -1,46 +1,9 @@
 import { defineStore } from 'pinia';
+import { createCartSeed } from '@/data/products';
 
 export const useCartStore = defineStore('cart', {
   state: () => ({
-    // Mock data selaras dengan Figma node 812:429
-    stores: [
-      {
-        id: 1,
-        name: 'JungleFood',
-        items: [
-          {
-            id: 101,
-            name: 'Indomie Goreng',
-            price: 7000,
-            quantity: 1,
-            selected: false,
-            image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=300',
-          },
-        ],
-      },
-      {
-        id: 2,
-        name: 'MeetUp Cafe',
-        items: [
-          {
-            id: 201,
-            name: 'Doritos',
-            price: 7000,
-            quantity: 1,
-            selected: false,
-            image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300',
-          },
-          {
-            id: 202,
-            name: 'Golda',
-            price: 8000,
-            quantity: 2,
-            selected: true,
-            image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300',
-          },
-        ],
-      },
-    ],
+    stores: createCartSeed(),
   }),
   getters: {
     totalPrice(state) {

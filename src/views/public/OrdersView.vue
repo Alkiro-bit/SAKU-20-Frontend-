@@ -1,55 +1,8 @@
 <script setup>
-import { ref } from 'vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
-
-const orders = ref([
-  {
-    id: 1,
-    storeName: 'JungleFood',
-    status: 'pending',
-    pickupNumber: '168',
-    item: {
-      name: 'Indomie Goreng',
-      quantity: 1,
-      image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=300',
-    },
-  },
-  {
-    id: 2,
-    storeName: 'TEFA',
-    status: 'ready',
-    pickupNumber: '88',
-    item: {
-      name: 'Golda',
-      quantity: 2,
-      image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300',
-    },
-  },
-  {
-    id: 3,
-    storeName: 'Meetup Cafe',
-    status: 'completed',
-    pickupNumber: '9',
-    item: {
-      name: 'GoodDay',
-      quantity: 2,
-      image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=300',
-    },
-  },
-  {
-    id: 4,
-    storeName: 'Bisnis Digital',
-    status: 'canceled',
-    pickupNumber: '67',
-    item: {
-      name: 'Makaroni Kongz',
-      quantity: 1,
-      image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300',
-    },
-  },
-]);
+import { orders } from '@/data/products';
 </script>
 
 <template>

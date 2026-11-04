@@ -4,33 +4,15 @@ import { Icon } from '@iconify/vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import ProductCard from '@/components/modules/ProductCard.vue';
+import { categories, tefaProducts, tefaNewest } from '@/data/products';
 
 const searchQuery = ref('');
 const selectedCategory = ref('Semua');
 
-const categories = [
-  'Semua',
-  'Makanan',
-  'Minuman',
-  'Bahan Masakan',
-  'Kesehatan & Kebersihan',
-];
-
-const tefaProducts = ref([
-  { id: 101, name: 'Es Teh Manis', price: 5000, category: 'Minuman', image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300' },
-  { id: 102, name: 'Indomie Goreng', price: 7000, category: 'Makanan', image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=300' },
-  { id: 103, name: 'Cireng', price: 6000, category: 'Makanan', image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=300' },
-  { id: 104, name: 'Kapal Api', price: 7000, category: 'Minuman', image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300' },
-]);
-
-const newestTefaProducts = ref([
-  { id: 104, name: 'Kapal Api', price: 7000, image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300' },
-  { id: 101, name: 'Es Teh Manis', price: 5000, image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300' },
-  { id: 103, name: 'Cireng', price: 6000, image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=300' },
-]);
+const newestTefaProducts = tefaNewest;
 
 const filteredProducts = computed(() => {
-  return tefaProducts.value.filter((p) => {
+  return tefaProducts.filter((p) => {
     const matchCategory =
       selectedCategory.value === 'Semua' || p.category === selectedCategory.value;
     const matchQuery =

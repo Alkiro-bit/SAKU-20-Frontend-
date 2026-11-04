@@ -1,23 +1,8 @@
 <script setup>
-import { ref, onMounted } from 'vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import ProductCard from '@/components/modules/ProductCard.vue';
-
-// Placeholder / mock state selaras dengan Figma node 777:228
-const bestSellers = ref([
-  { id: 1, name: 'Es Teh Manis', price: 5000, image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300' },
-  { id: 2, name: 'Cireng', price: 6000, image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=300' },
-  { id: 3, name: 'Kapal Api', price: 7000, image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300' },
-  { id: 4, name: 'Indomie Goreng', price: 7000, image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=300' },
-]);
-
-const newestProducts = ref([
-  { id: 1, name: 'Es Teh Manis', price: 5000, image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300' },
-  { id: 4, name: 'Indomie Goreng', price: 7000, image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=300' },
-  { id: 2, name: 'Cireng', price: 6000, image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=300' },
-  { id: 3, name: 'Kapal Api', price: 7000, image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300' },
-]);
+import { bestSellers, newestProducts } from '@/data/products';
 </script>
 
 <template>
