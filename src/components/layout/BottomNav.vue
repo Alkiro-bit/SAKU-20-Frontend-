@@ -7,19 +7,14 @@ const route = useRoute();
 
 const tabs = [
   { name: 'Home', path: '/', icon: 'ant-design:home-filled' },
-  { name: 'Shop', path: '/stores?type=siswa', icon: 'material-symbols:menu-book-2' },
-  { name: 'TEFA', path: '/stores?type=tefa', icon: 'entypo:shop', isTefa: true },
+  { name: 'Shop', path: '/stores', icon: 'material-symbols:menu-book-2' },
+  { name: 'TEFA', path: '/tefa', icon: 'entypo:shop', isTefa: true },
   { name: 'Cart', path: '/cart', icon: 'boxicons:cart-filled' },
   { name: 'History', path: '/history', icon: 'boxicons:receipt-filled' },
 ];
 
 function isActive(tab) {
   if (tab.path === '/') return route.path === '/';
-  if (tab.path.includes('?')) {
-    const [path, query] = tab.path.split('?');
-    const [qKey, qVal] = query.split('=');
-    return route.path === path && route.query[qKey] === qVal;
-  }
   return route.path.startsWith(tab.path);
 }
 </script>

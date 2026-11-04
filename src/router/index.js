@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from '@/views/public/HomeView.vue';
 import ShopView from '@/views/public/ShopView.vue';
+import TefaView from '@/views/public/TefaView.vue';
+import CartView from '@/views/public/CartView.vue';
 
 const routes = [
   {
@@ -14,9 +16,14 @@ const routes = [
     component: ShopView,
   },
   {
+    path: '/tefa',
+    name: 'tefa',
+    component: TefaView,
+  },
+  {
     path: '/cart',
     name: 'cart',
-    component: HomeView, // placeholder
+    component: CartView,
   },
   {
     path: '/history',
