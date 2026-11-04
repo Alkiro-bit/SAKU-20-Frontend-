@@ -5,19 +5,28 @@ import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import StoreCard from '@/components/modules/StoreCard.vue';
 import ProductCard from '@/components/modules/ProductCard.vue';
-import { stores, shopNewest, shopProducts } from '@/data/products';
+import { stores, shopNewest, allShopProducts } from '@/data/products';
 
 const searchQuery = ref('');
+const selectedStoreId = ref(null);
 
-const allProducts = shopProducts;
+const allProducts = allShopProducts;
 const newestProducts = shopNewest;
 
+const storeFilters = [{ id: null, name: 'All' }, ...stores];
+
 const filteredProducts = computed(() => {
-  if (!searchQuery.value.trim()) return allProducts;
-  return allProducts.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-  );
+  const q = searchQuery.value.trim().toLowerCase();
+  return allProducts.filter((p) => {
+    const matchStore = selectedStoreId.value === null || p.storeId === selectedStoreId.value;
+    const matchQuery = !q || p.name.toLowerCase().includes(q);
+    return matchStore && matchQuery;
+  });
 });
+
+function toggleStore(store) {
+  selectedStoreId.value = selectedStoreId.value === store.id ? null : store.id;
+}
 </script>
 
 <template>
@@ -45,9 +54,11 @@ const filteredProducts = computed(() => {
         </div>
         <div class="stores-track">
           <StoreCard
-            v-for="store in stores"
+            v-for="store in storeFilters"
             :key="'store-' + store.id"
             :store="store"
+            :active="selectedStoreId === store.id"
+            @select="toggleStore"
           />
         </div>
       </section>

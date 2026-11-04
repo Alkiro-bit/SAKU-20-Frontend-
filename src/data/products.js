@@ -2,14 +2,14 @@ const img = (id) => `https://images.unsplash.com/${id}?w=300`;
 
 // ponytail: single source of truth untuk data dummy. Ganti ke apiClient saat backend siap.
 const p = {
-  esTeh: { id: 1, name: 'Es Teh Manis', price: 5000, category: 'Minuman', image: img('photo-1556679343-c7306c1976bc') },
-  indomie: { id: 2, name: 'Indomie Goreng', price: 7000, category: 'Makanan', image: img('photo-1612927601601-6638404737ce') },
-  cireng: { id: 3, name: 'Cireng', price: 6000, category: 'Makanan', image: img('photo-1541592106381-b31e9677c0e5') },
-  kapalApi: { id: 4, name: 'Kapal Api', price: 7000, category: 'Minuman', image: img('photo-1514432324607-a09d9b4aefdd') },
-  doritos: { id: 5, name: 'Doritos', price: 7000, category: 'Makanan', image: img('photo-1566478989037-eec170784d0b') },
-  golda: { id: 6, name: 'Golda', price: 8000, category: 'Minuman', image: img('photo-1514432324607-a09d9b4aefdd') },
-  goodDay: { id: 7, name: 'GoodDay', price: 8000, category: 'Minuman', image: img('photo-1541592106381-b31e9677c0e5') },
-  makaroni: { id: 8, name: 'Makaroni Kongz', price: 6000, category: 'Makanan', image: img('photo-1566478989037-eec170784d0b') },
+  esTeh: { id: 1, storeId: 1, name: 'Es Teh Manis', price: 5000, category: 'Minuman', image: img('photo-1556679343-c7306c1976bc') },
+  indomie: { id: 2, storeId: 1, name: 'Indomie Goreng', price: 7000, category: 'Makanan', image: img('photo-1612927601601-6638404737ce') },
+  cireng: { id: 3, storeId: 2, name: 'Cireng', price: 6000, category: 'Makanan', image: img('photo-1541592106381-b31e9677c0e5') },
+  kapalApi: { id: 4, storeId: 2, name: 'Kapal Api', price: 7000, category: 'Minuman', image: img('photo-1514432324607-a09d9b4aefdd') },
+  doritos: { id: 5, storeId: 2, name: 'Doritos', price: 7000, category: 'Makanan', image: img('photo-1566478989037-eec170784d0b') },
+  golda: { id: 6, storeId: 2, name: 'Golda', price: 8000, category: 'Minuman', image: img('photo-1514432324607-a09d9b4aefdd') },
+  goodDay: { id: 7, storeId: 3, name: 'GoodDay', price: 8000, category: 'Minuman', image: img('photo-1541592106381-b31e9677c0e5') },
+  makaroni: { id: 8, storeId: 4, name: 'Makaroni Kongz', price: 6000, category: 'Makanan', image: img('photo-1566478989037-eec170784d0b') },
 };
 
 export const products = p;
@@ -27,21 +27,21 @@ export const newestProducts = [p.esTeh, p.indomie, p.cireng, p.kapalApi];
 
 export const shopNewest = [p.esTeh, p.cireng, p.indomie];
 
-export const shopProducts = [p.esTeh, p.indomie, p.cireng, p.kapalApi];
+export const allShopProducts = Object.values(p);
 
 export const tefaProducts = [p.esTeh, p.indomie, p.cireng, p.kapalApi];
 
 export const tefaNewest = [p.kapalApi, p.esTeh, p.cireng];
 
 export const categories = [
-  'Semua',
+  'All',
   'Makanan',
   'Minuman',
   'Bahan Masakan',
   'Kesehatan & Kebersihan',
 ];
 
-export const cartSeed = [
+export const createCartSeed = () => [
   {
     id: 1,
     name: 'JungleFood',

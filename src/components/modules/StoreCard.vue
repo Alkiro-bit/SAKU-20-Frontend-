@@ -4,13 +4,24 @@ defineProps({
     type: Object,
     required: true,
   },
+  active: {
+    type: Boolean,
+    default: false,
+  },
 });
+
+defineEmits(['select']);
 </script>
 
 <template>
-  <router-link :to="`/stores/${store.id}`" class="store-card">
+  <button
+    type="button"
+    class="store-card"
+    :class="{ 'is-active': active }"
+    @click="$emit('select', store)"
+  >
     <span class="store-name">{{ store.name }}</span>
-  </router-link>
+  </button>
 </template>
 
 <style scoped>
@@ -27,11 +38,22 @@ defineProps({
   justify-content: center;
   padding: 8px;
   text-align: center;
+  font: inherit;
+  cursor: pointer;
   transition: transform var(--transition-fast), border-color var(--transition-fast);
 }
 
 .store-card:active {
   transform: scale(0.96);
+}
+
+.store-card.is-active {
+  background-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  border-color: var(--color-primary);
+}
+
+.store-card.is-active .store-name {
+  color: var(--color-primary);
 }
 
 .store-name {
