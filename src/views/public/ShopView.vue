@@ -1,32 +1,77 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { Icon } from '@iconify/vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import StoreCard from '@/components/modules/StoreCard.vue';
 import ProductCard from '@/components/modules/ProductCard.vue';
-import { stores, shopNewest, allShopProducts } from '@/data/products';
+import { getStores, getStoreProducts, getApiErrorMessage } from '@/services/api';
 
 const searchQuery = ref('');
 const selectedStoreId = ref(null);
+const loading = ref(false);
+const error = ref('');
 
-const allProducts = allShopProducts;
-const newestProducts = shopNewest;
+const storesList = ref([]);
+const rawProducts = ref([]);
 
-const storeFilters = [{ id: null, name: 'All' }, ...stores];
+const storeFilters = computed(() => [{ id: null, name: 'All' }, ...storesList.value]);
+const allProducts = computed(() => rawProducts.value);
+const newestProducts = computed(() => rawProducts.value.slice(0, 6));
 
 const filteredProducts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
-  return allProducts.filter((p) => {
-    const matchStore = selectedStoreId.value === null || p.storeId === selectedStoreId.value;
+  return allProducts.value.filter((p) => {
+    const storeId = p.store_id ?? p.storeId;
+    const matchStore = selectedStoreId.value === null || storeId === selectedStoreId.value;
     const matchQuery = !q || p.name.toLowerCase().includes(q);
     return matchStore && matchQuery;
   });
 });
 
+async function loadProducts(storeId = null) {
+  loading.value = true;
+  error.value = '';
+  try {
+    if (storeId) {
+      const items = await getStoreProducts(storeId);
+      rawProducts.value = items;
+    } else {
+      const results = await Promise.allSettled(storesList.value.map((s) => getStoreProducts(s.id)));
+      const combined = [];
+      results.forEach((res) => {
+        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+          combined.push(...res.value);
+        }
+      });
+      rawProducts.value = combined;
+    }
+  } catch (e) {
+    error.value = getApiErrorMessage(e, 'Gagal memuat produk dari server.');
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function loadInitialData() {
+  try {
+    const apiStores = await getStores({ type: 'siswa' });
+    storesList.value = apiStores || [];
+  } catch {
+    storesList.value = [];
+  }
+  await loadProducts(selectedStoreId.value);
+}
+
 function toggleStore(store) {
   selectedStoreId.value = selectedStoreId.value === store.id ? null : store.id;
 }
+
+watch(selectedStoreId, (newStoreId) => {
+  loadProducts(newStoreId);
+});
+
+onMounted(loadInitialData);
 </script>
 
 <template>

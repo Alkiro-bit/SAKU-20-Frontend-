@@ -30,6 +30,14 @@ const notes = ref('');
 const isAdding = ref(false);
 const addError = ref('');
 
+const isOutOfStock = computed(() => {
+  return product.value && typeof product.value.stock === 'number' && product.value.stock <= 0;
+});
+
+const storeName = computed(() => {
+  return product.value?.store_name || product.value?.store?.name || '';
+});
+
 async function fetchProduct() {
   loading.value = true;
   error.value = '';
@@ -54,6 +62,7 @@ function formatRupiah(value) {
 }
 
 function increment() {
+  if (product.value?.stock && quantity.value >= product.value.stock) return;
   quantity.value++;
 }
 
@@ -117,7 +126,8 @@ onMounted(fetchProduct);
         <section class="title-price-section">
           <h1 class="product-title">{{ product.name }}</h1>
           <p class="product-price">{{ formatRupiah(product.price) }}</p>
-          <p v-if="product.store_name" class="product-store">{{ product.store_name }}</p>
+          <p v-if="storeName" class="product-store">{{ storeName }}</p>
+          <p v-if="product.stock !== undefined" class="product-stock">Stok: {{ product.stock }}</p>
         </section>
 
         <!-- Description -->
@@ -170,10 +180,10 @@ onMounted(fetchProduct);
           <button
             type="button"
             class="add-to-cart-btn"
-            :disabled="isAdding"
+            :disabled="isAdding || isOutOfStock"
             @click="handleAddToCart"
           >
-            {{ isAdding ? 'Menambahkan…' : 'Add to Cart' }}
+            {{ isOutOfStock ? 'Stok Habis' : isAdding ? 'Menambahkan…' : 'Add to Cart' }}
           </button>
         </section>
       </template>
@@ -213,6 +223,12 @@ onMounted(fetchProduct);
 .product-store {
   font-family: var(--font-family-base);
   font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.product-stock {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
 

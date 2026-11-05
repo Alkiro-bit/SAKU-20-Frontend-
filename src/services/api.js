@@ -54,3 +54,24 @@ export function resolveImageUrl(pathOrUrl, fallback = 'https://placehold.co/300x
   const cleanPath = pathOrUrl.startsWith('/') ? pathOrUrl.slice(1) : pathOrUrl;
   return `${STORAGE_BASE_URL}/${cleanPath}`;
 }
+
+export async function getStores(params = {}) {
+  const res = await apiClient.get('/stores', { params });
+  return res.data?.data || [];
+}
+
+export async function getStore(storeId) {
+  const res = await apiClient.get(`/stores/${storeId}`);
+  return res.data?.data || null;
+}
+
+export async function getStoreProducts(storeId, params = {}) {
+  const res = await apiClient.get(`/stores/${storeId}/products`, { params });
+  return res.data?.data || [];
+}
+
+export async function getProduct(productId) {
+  const res = await apiClient.get(`/products/${productId}`);
+  return res.data?.data || null;
+}
+

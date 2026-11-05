@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { apiClient, resolveImageUrl } from '@/services/api';
+import { apiClient, resolveImageUrl, getStore } from '@/services/api';
 
 const CART_STORE_ID_KEY = 'cart_store_id';
 
@@ -48,6 +48,14 @@ export const useCartStore = defineStore('cart', {
         this.cartId = cart?.id || null;
         this.storeId = targetStoreId;
         this.storeName = cart?.store_name || cart?.store?.name || '';
+        if (!this.storeName && targetStoreId) {
+          try {
+            const storeData = await getStore(targetStoreId);
+            if (storeData?.name) this.storeName = storeData.name;
+          } catch {
+            this.storeName = `Toko #${targetStoreId}`;
+          }
+        }
         this.items = (cart?.items || []).map(normalizeCartItem);
         localStorage.setItem(CART_STORE_ID_KEY, String(targetStoreId));
       } catch (e) {

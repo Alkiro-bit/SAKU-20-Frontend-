@@ -1,8 +1,32 @@
 <script setup>
+import { ref, computed, onMounted } from 'vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import ProductCard from '@/components/modules/ProductCard.vue';
-import { bestSellers, newestProducts } from '@/data/products';
+import { getStores, getStoreProducts } from '@/services/api';
+
+const apiProducts = ref([]);
+
+const bestSellers = computed(() => apiProducts.value.slice(0, 5));
+const newestProducts = computed(() => apiProducts.value.slice().reverse());
+
+onMounted(async () => {
+  try {
+    const stores = await getStores({ type: 'siswa' });
+    if (stores && stores.length) {
+      const results = await Promise.allSettled(stores.map((s) => getStoreProducts(s.id)));
+      const items = [];
+      results.forEach((res) => {
+        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+          items.push(...res.value);
+        }
+      });
+      apiProducts.value = items;
+    }
+  } catch {
+    apiProducts.value = [];
+  }
+});
 </script>
 
 <template>

@@ -1,25 +1,50 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { Icon } from '@iconify/vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import ProductCard from '@/components/modules/ProductCard.vue';
-import { tefaProducts, tefaNewest, categories } from '@/data/products';
+import { getStores, getStoreProducts } from '@/services/api';
 
 const searchQuery = ref('');
 const selectedCategory = ref('All');
+const apiProducts = ref([]);
 
-const newestTefaProducts = tefaNewest;
+const categories = computed(() => {
+  const dynamic = new Set();
+  apiProducts.value.forEach((p) => {
+    if (p.category?.name) dynamic.add(p.category.name);
+    else if (p.category) dynamic.add(p.category);
+  });
+  return ['All', ...Array.from(dynamic)];
+});
+
+const allProducts = computed(() => apiProducts.value);
+const newestTefaProducts = computed(() => apiProducts.value.slice(0, 5));
 
 const filteredProducts = computed(() => {
-  return tefaProducts.filter((p) => {
+  return allProducts.value.filter((p) => {
+    const catName = p.category?.name || p.category;
     const matchCategory =
-      selectedCategory.value === 'All' || p.category === selectedCategory.value;
+      selectedCategory.value === 'All' || catName === selectedCategory.value;
     const matchQuery =
       !searchQuery.value.trim() ||
       p.name.toLowerCase().includes(searchQuery.value.toLowerCase());
     return matchCategory && matchQuery;
   });
+});
+
+onMounted(async () => {
+  try {
+    const tefaStores = await getStores({ type: 'tefa' });
+    const tefaStore = tefaStores.find((s) => s.store_type === 'tefa') || tefaStores[0];
+    if (tefaStore) {
+      const items = await getStoreProducts(tefaStore.id);
+      apiProducts.value = items || [];
+    }
+  } catch {
+    apiProducts.value = [];
+  }
 });
 </script>
 
