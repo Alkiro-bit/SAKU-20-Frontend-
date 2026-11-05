@@ -70,7 +70,7 @@ async function processCheckout(cartId) {
       router.replace('/orders');
     }
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Checkout gagal. Coba lagi.');
+    error.value = getApiErrorMessage(e, 'Checkout failed. Try again.');
   } finally {
     isSubmitting.value = false;
   }
@@ -79,7 +79,7 @@ async function processCheckout(cartId) {
 async function handleCheckout() {
   error.value = '';
   if (cartStore.isEmpty) {
-    error.value = 'Keranjang kosong. Tidak dapat melakukan checkout.';
+    error.value = 'Cart is empty. Cannot proceed to checkout.';
     return;
   }
 
@@ -100,7 +100,7 @@ onMounted(async () => {
   try {
     await cartStore.fetchAllCarts();
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memuat keranjang.');
+    error.value = getApiErrorMessage(e, 'Failed to load cart.');
   }
 });
 </script>
@@ -117,12 +117,12 @@ onMounted(async () => {
       <p v-if="error" class="cart-error" role="alert">{{ error }}</p>
 
       <div v-if="cartStore.loading" class="cart-empty">
-        <p>Memuat keranjang…</p>
+        <p>Loading cart…</p>
       </div>
 
       <div v-else-if="cartStore.isEmpty" class="cart-empty">
         <Icon icon="mdi:cart-off" width="48" height="48" />
-        <p>Keranjang kosong</p>
+        <p>Cart is empty</p>
       </div>
 
       <div v-else class="cart-list">
@@ -190,6 +190,24 @@ onMounted(async () => {
               </div>
             </div>
           </div>
+
+          <div class="cart-seller-note">
+            <div class="note-header">
+              <span class="note-label">
+                <Icon icon="mdi:note-text-outline" width="16" height="16" />
+                Catatan untuk Penjual
+              </span>
+              <span class="char-count">{{ (cartStore.getSellerNote(group.store_id) || '').length }}/500</span>
+            </div>
+            <textarea
+              class="cart-note-input"
+              maxlength="500"
+              :value="cartStore.getSellerNote(group.store_id)"
+              @input="cartStore.setSellerNote(group.store_id, $event.target.value)"
+              placeholder="Contoh: Tidak pedas, saus dipisah"
+              rows="2"
+            />
+          </div>
         </div>
       </div>
     </main>
@@ -205,7 +223,7 @@ onMounted(async () => {
         :disabled="cartStore.isEmpty || isSubmitting"
         @click="handleCheckout"
       >
-        {{ isSubmitting ? 'Memproses…' : 'Checkout' }}
+        {{ isSubmitting ? 'Processing…' : 'Checkout' }}
       </button>
     </div>
 
@@ -303,6 +321,7 @@ onMounted(async () => {
 }
 
 .cart-empty {
+  font-family: var(--font-family-base);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -650,5 +669,53 @@ onMounted(async () => {
   padding: 8px 16px;
   border-radius: 6px;
   color: var(--color-text-muted);
+}
+
+.cart-seller-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background-color: #fafafa;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.note-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.char-count {
+  font-family: var(--font-family-base);
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+.cart-note-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-xs);
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  resize: vertical;
+}
+
+.cart-note-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 </style>

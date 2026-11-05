@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { Icon } from '@iconify/vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
@@ -18,7 +19,7 @@ async function fetchOrders() {
     const res = await apiClient.get('/orders');
     orders.value = res.data.data || [];
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memuat riwayat pesanan.');
+    error.value = getApiErrorMessage(e, 'Failed to load orders.');
   } finally {
     loading.value = false;
   }
@@ -48,11 +49,11 @@ onMounted(fetchOrders);
       <p v-if="error" class="orders-error" role="alert">{{ error }}</p>
 
       <div v-if="loading" class="orders-empty">
-        <p>Memuat pesanan…</p>
+        <p>Loading orders…</p>
       </div>
 
       <div v-else-if="orders.length === 0" class="orders-empty">
-        <p>Belum ada pesanan.</p>
+        <p>No orders found.</p>
       </div>
 
       <div v-else class="orders-list">
@@ -92,6 +93,11 @@ onMounted(fetchOrders);
                 {{ order.queue_number }}
               </span>
             </div>
+          </div>
+
+          <div v-if="order.seller_note" class="order-note-row">
+            <Icon icon="mdi:note-text-outline" width="14" height="14" class="note-icon" />
+            <span class="note-text">Catatan: {{ order.seller_note }}</span>
           </div>
         </div>
       </div>
@@ -264,5 +270,28 @@ onMounted(fetchOrders);
 
 .pickup-number.is-muted {
   color: var(--color-text-muted);
+}
+
+.order-note-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 14px;
+  background-color: #f9fafb;
+  border-top: 0.5px solid #e5e7eb;
+}
+
+.note-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-primary);
+}
+
+.note-text {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-xs);
+  color: #4b5563;
+  line-height: 1.4;
+  word-break: break-word;
 }
 </style>

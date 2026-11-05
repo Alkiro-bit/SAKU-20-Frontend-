@@ -130,6 +130,15 @@ onMounted(async () => {
             <span>{{ formatRupiah(order.total) }}</span>
           </div>
         </section>
+
+        <!-- Seller Note -->
+        <section v-if="order.seller_note" class="note-card">
+          <div class="note-header">
+            <Icon icon="mdi:note-text-outline" width="18" height="18" />
+            <span class="note-title">Catatan untuk Penjual</span>
+          </div>
+          <p class="note-body">{{ order.seller_note }}</p>
+        </section>
       </template>
     </main>
 
@@ -328,5 +337,40 @@ onMounted(async () => {
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-base);
   color: var(--color-text);
+}
+
+.note-card {
+  background-color: var(--color-surface);
+  border-radius: 10px;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.12);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-primary);
+}
+
+.note-title {
+  font-family: var(--font-family-brand);
+  font-weight: var(--font-weight-medium);
+  font-size: 16px;
+  color: var(--color-text);
+}
+
+.note-body {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  line-height: 1.5;
+  background-color: #f9fafb;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border-left: 3px solid var(--color-primary);
 }
 </style>

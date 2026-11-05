@@ -45,6 +45,9 @@ async function fetchProduct() {
     const res = await apiClient.get(`/products/${productId.value}`);
     const data = res.data.data;
     product.value = data ? { ...data, image: resolveImageUrl(data.image_url || data.image) } : null;
+    if (product.value?.store_id && !notes.value) {
+      notes.value = cartStore.getSellerNote(product.value.store_id) || '';
+    }
   } catch (e) {
     error.value = getApiErrorMessage(e, 'Gagal memuat detail produk.');
   } finally {
@@ -74,11 +77,15 @@ function decrement() {
 
 async function handleAddToCart() {
   if (isAdding.value || !product.value) return;
+  if (notes.value && notes.value.length > 500) {
+    addError.value = 'Catatan tidak boleh melebihi 500 karakter.';
+    return;
+  }
   isAdding.value = true;
   addError.value = '';
 
   try {
-    await cartStore.addItem(product.value.store_id, product.value.id, quantity.value);
+    await cartStore.addItem(product.value.store_id, product.value.id, quantity.value, notes.value);
     router.push('/cart');
   } catch (e) {
     addError.value = getApiErrorMessage(e, 'Gagal menambahkan ke keranjang.');
@@ -167,12 +174,16 @@ onMounted(fetchProduct);
           </div>
 
           <div class="notes-block">
-            <label for="product-notes" class="notes-label">Notes (Optional)</label>
+            <div class="notes-header">
+              <label for="product-notes" class="notes-label">Catatan untuk Penjual (Opsional)</label>
+              <span class="char-count" :class="{ 'char-limit': notes.length >= 500 }">{{ notes.length }}/500</span>
+            </div>
             <textarea
               id="product-notes"
               v-model="notes"
               class="notes-textarea"
-              placeholder="Add your notes to seller..."
+              maxlength="500"
+              placeholder="Contoh: Tidak pedas, saus dipisah"
               rows="4"
             />
           </div>
@@ -391,11 +402,28 @@ onMounted(fetchProduct);
   gap: 6px;
 }
 
+.notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .notes-label {
   font-family: var(--font-family-base);
   font-weight: var(--font-weight-regular);
   font-size: 12px;
   color: var(--color-text);
+}
+
+.char-count {
+  font-family: var(--font-family-base);
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+.char-limit {
+  color: #b42318;
+  font-weight: var(--font-weight-medium);
 }
 
 .notes-textarea {

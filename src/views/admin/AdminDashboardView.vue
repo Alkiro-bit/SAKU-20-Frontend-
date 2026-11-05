@@ -105,9 +105,15 @@ onMounted(async () => {
           <div v-if="orders.length === 0" class="empty">Belum ada pesanan.</div>
           <div v-else class="order-list">
             <div v-for="order in orders" :key="order.id" class="order-row">
-              <div class="order-info">
-                <span class="order-queue">#{{ order.queue_number }}</span>
-                <StatusBadge :status="order.status" />
+              <div class="order-main">
+                <div class="order-info">
+                  <span class="order-queue">#{{ order.queue_number }}</span>
+                  <StatusBadge :status="order.status" />
+                </div>
+                <div v-if="order.seller_note" class="order-seller-note">
+                  <Icon icon="mdi:note-text-outline" width="14" height="14" class="note-icon" />
+                  <span><strong>Catatan:</strong> {{ order.seller_note }}</span>
+                </div>
               </div>
               <div v-if="order.status === 'diproses'" class="order-actions">
                 <button class="action-btn ready" @click="updateOrderStatus(order, 'siap_diambil')">
@@ -250,15 +256,44 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 10px 12px;
   background-color: #f9fafb;
   border-radius: 8px;
+}
+
+.order-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
 }
 
 .order-info {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.order-seller-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: #374151;
+  background-color: #ffffff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border-left: 3px solid var(--color-primary);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.order-seller-note .note-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-primary);
 }
 
 .order-queue {

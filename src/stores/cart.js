@@ -3,6 +3,7 @@ import { apiClient, resolveImageUrl, getStore } from '@/services/api';
 
 const CART_STORE_IDS_KEY = 'cart_store_ids';
 const LEGACY_CART_STORE_ID_KEY = 'cart_store_id';
+const CART_SELLER_NOTES_KEY = 'cart_seller_notes';
 
 function getStorage() {
   return typeof localStorage !== 'undefined' ? localStorage : null;
@@ -31,6 +32,7 @@ export function createStoreGroup(rawCart, fallbackStoreId = null, fallbackStoreN
   const items = (rawCart.items || []).map((item) => normalizeCartItem(item, storeId));
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const sellerNote = rawCart.seller_note || rawCart.sellerNote || null;
 
   return {
     store_id: storeId,
@@ -43,7 +45,29 @@ export function createStoreGroup(rawCart, fallbackStoreId = null, fallbackStoreN
     subtotal,
     total_quantity: totalQuantity,
     totalQuantity,
+    seller_note: sellerNote,
   };
+}
+
+export function getStoredSellerNotes() {
+  const storage = getStorage();
+  if (!storage) return {};
+  const stored = storage.getItem(CART_SELLER_NOTES_KEY);
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {
+      // ignore
+    }
+  }
+  return {};
+}
+
+export function saveStoredSellerNotes(notes) {
+  const storage = getStorage();
+  if (!storage) return;
+  storage.setItem(CART_SELLER_NOTES_KEY, JSON.stringify(notes || {}));
 }
 
 export function getStoredStoreIds() {
@@ -77,6 +101,7 @@ export function saveStoredStoreIds(storeIds) {
 export const useCartStore = defineStore('cart', {
   state: () => ({
     groups: [],
+    sellerNotes: getStoredSellerNotes(),
     loading: false,
     isSubmitting: false,
   }),
@@ -111,10 +136,57 @@ export const useCartStore = defineStore('cart', {
       const active = state.groups.find((g) => g.items && g.items.length > 0);
       return active?.store_name || '';
     },
+    sellerNote(state) {
+      const active = state.groups.find((g) => g.items && g.items.length > 0);
+      return (
+        active?.seller_note ||
+        (active?.store_id ? state.sellerNotes[String(active.store_id)] : '') ||
+        ''
+      );
+    },
   },
   actions: {
+    setSellerNote(storeId, note) {
+      if (!storeId) return;
+      const key = String(storeId);
+      const cleanNote = typeof note === 'string' ? note.slice(0, 500) : '';
+      if (cleanNote) {
+        this.sellerNotes[key] = cleanNote;
+      } else {
+        delete this.sellerNotes[key];
+      }
+      saveStoredSellerNotes(this.sellerNotes);
+
+      const group = this.groups.find((g) => g.store_id === Number(storeId));
+      if (group) {
+        group.seller_note = cleanNote || null;
+      }
+    },
+
+    getSellerNote(storeId) {
+      if (!storeId) return '';
+      return (
+        this.sellerNotes[String(storeId)] ||
+        this.groups.find((g) => g.store_id === Number(storeId))?.seller_note ||
+        ''
+      );
+    },
+
+    removeSellerNote(storeId) {
+      if (!storeId) return;
+      delete this.sellerNotes[String(storeId)];
+      saveStoredSellerNotes(this.sellerNotes);
+    },
+
     upsertGroup(group) {
       if (!group || !group.store_id) return;
+      const storedNote = this.sellerNotes[String(group.store_id)];
+      if (storedNote && !group.seller_note) {
+        group.seller_note = storedNote;
+      } else if (group.seller_note && !storedNote) {
+        this.sellerNotes[String(group.store_id)] = group.seller_note;
+        saveStoredSellerNotes(this.sellerNotes);
+      }
       const idx = this.groups.findIndex((g) => g.store_id === group.store_id);
       if (idx >= 0) {
         this.groups[idx] = group;
@@ -125,11 +197,17 @@ export const useCartStore = defineStore('cart', {
     },
 
     removeGroup(cartId = null, storeId = null) {
+      const removedStoreIds = [];
       this.groups = this.groups.filter((g) => {
-        if (cartId && (g.cart_id === cartId || g.cartId === cartId)) return false;
-        if (storeId && (g.store_id === storeId || g.storeId === storeId)) return false;
+        const matchesCart = Boolean(cartId && (g.cart_id === cartId || g.cartId === cartId));
+        const matchesStore = Boolean(storeId && (g.store_id === storeId || g.storeId === storeId));
+        if (matchesCart || matchesStore) {
+          if (g.store_id) removedStoreIds.push(g.store_id);
+          return false;
+        }
         return true;
       });
+      removedStoreIds.forEach((id) => this.removeSellerNote(id));
       this.persistStoreIds();
     },
 
@@ -197,7 +275,10 @@ export const useCartStore = defineStore('cart', {
       }
     },
 
-    async addItem(storeId, productId, quantity = 1) {
+    async addItem(storeId, productId, quantity = 1, sellerNote = null) {
+      if (sellerNote && typeof sellerNote === 'string' && sellerNote.trim()) {
+        this.setSellerNote(storeId, sellerNote.trim());
+      }
       const res = await apiClient.post('/cart/items', {
         store_id: storeId,
         product_id: productId,
@@ -260,15 +341,57 @@ export const useCartStore = defineStore('cart', {
       this.removeGroup(cartId);
     },
 
-    async checkout(targetCartId = null) {
-      const cartId = targetCartId || this.cartGroups[0]?.cart_id;
-      if (!cartId) throw new Error('Keranjang kosong');
+    async checkout(targetCartId = null, noteOverride = undefined) {
+      const targetGroup = targetCartId
+        ? this.groups.find((g) => g.cart_id === targetCartId || g.cartId === targetCartId)
+        : this.cartGroups[0];
+      const cartId = targetGroup?.cart_id || targetCartId;
+      const storeId = targetGroup?.store_id;
+
+      if (!cartId && !storeId) throw new Error('Keranjang kosong');
       if (this.isSubmitting) return;
+
+      const rawNote =
+        noteOverride !== undefined
+          ? noteOverride
+          : (storeId ? this.getSellerNote(storeId) : '') || targetGroup?.seller_note || '';
+
+      const trimmedNote = typeof rawNote === 'string' && rawNote.trim() ? rawNote.trim() : null;
+
+      if (trimmedNote && trimmedNote.length > 500) {
+        const error = new Error('Catatan untuk penjual maksimal 500 karakter.');
+        error.response = {
+          status: 422,
+          data: {
+            success: false,
+            message: 'Catatan untuk penjual maksimal 500 karakter.',
+            errors: { seller_note: ['Catatan untuk penjual tidak boleh lebih dari 500 karakter.'] },
+          },
+        };
+        throw error;
+      }
 
       this.isSubmitting = true;
       try {
-        const res = await apiClient.post('/orders', { cart_id: cartId });
-        this.removeGroup(cartId);
+        const payload = {};
+        if (cartId) {
+          payload.cart_id = cartId;
+        } else if (storeId) {
+          payload.store_id = storeId;
+        }
+        if (trimmedNote) {
+          payload.seller_note = trimmedNote;
+        }
+
+        const res = await apiClient.post('/orders', payload);
+        if (cartId) {
+          this.removeGroup(cartId);
+        } else if (storeId) {
+          this.removeGroup(null, storeId);
+        }
+        if (storeId) {
+          this.removeSellerNote(storeId);
+        }
         return res.data?.data || null;
       } finally {
         this.isSubmitting = false;
@@ -277,11 +400,13 @@ export const useCartStore = defineStore('cart', {
 
     resetCart() {
       this.groups = [];
+      this.sellerNotes = {};
       this.isSubmitting = false;
       const storage = getStorage();
       if (storage) {
         storage.removeItem(CART_STORE_IDS_KEY);
         storage.removeItem(LEGACY_CART_STORE_ID_KEY);
+        storage.removeItem(CART_SELLER_NOTES_KEY);
       }
     },
   },

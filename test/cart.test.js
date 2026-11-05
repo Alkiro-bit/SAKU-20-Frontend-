@@ -252,3 +252,103 @@ test('6. checkout gagal mengaktifkan kembali tombol', async () => {
     'Sesi Anda telah berakhir. Silakan login kembali.'
   );
 });
+
+test('7. checkout dengan seller_note mengirim field seller_note', async () => {
+  const store = setupTestCartStore();
+
+  const group = createStoreGroup({
+    id: 301,
+    store_id: 1,
+    store_name: 'Kantin Sekolah',
+    items: [
+      { id: 1, product_id: 11, name: 'Mie Goreng', price: 10000, quantity: 1 },
+    ],
+  });
+  store.upsertGroup(group);
+
+  const postRequests = [];
+  apiClient.post = async (url, data) => {
+    postRequests.push({ url, data });
+    return {
+      data: {
+        success: true,
+        data: {
+          id: 901,
+          store_id: 1,
+          seller_note: 'Tidak pedas, saus dipisah',
+          status: 'diproses',
+        },
+      },
+    };
+  };
+
+  store.setSellerNote(1, 'Tidak pedas, saus dipisah');
+  assert.strictEqual(store.getSellerNote(1), 'Tidak pedas, saus dipisah');
+
+  const result = await store.checkout(301);
+
+  assert.strictEqual(result.id, 901);
+  assert.strictEqual(result.seller_note, 'Tidak pedas, saus dipisah');
+  assert.strictEqual(postRequests.length, 1);
+  assert.strictEqual(postRequests[0].url, '/orders');
+  assert.deepStrictEqual(postRequests[0].data, {
+    cart_id: 301,
+    seller_note: 'Tidak pedas, saus dipisah',
+  });
+});
+
+test('8. seller_note melebihi 500 karakter ditolak validasi', async () => {
+  const store = setupTestCartStore();
+
+  const group = createStoreGroup({
+    id: 302,
+    store_id: 1,
+    store_name: 'Kantin Sekolah',
+    items: [
+      { id: 1, product_id: 11, name: 'Mie Goreng', price: 10000, quantity: 1 },
+    ],
+  });
+  store.upsertGroup(group);
+
+  const longNote = 'A'.repeat(501);
+
+  let caughtError = null;
+  try {
+    await store.checkout(302, longNote);
+  } catch (e) {
+    caughtError = e;
+  }
+
+  assert.ok(caughtError);
+  assert.strictEqual(caughtError.response?.status, 422);
+  assert.strictEqual(
+    getApiErrorMessage(caughtError),
+    'Catatan untuk penjual maksimal 500 karakter.'
+  );
+});
+
+test('9. seller_note terhapus setelah checkout berhasil', async () => {
+  const store = setupTestCartStore();
+
+  const group = createStoreGroup({
+    id: 303,
+    store_id: 5,
+    store_name: 'Toko Segar',
+    items: [
+      { id: 1, product_id: 15, name: 'Es Teh Manis', price: 5000, quantity: 1 },
+    ],
+  });
+  store.upsertGroup(group);
+
+  apiClient.post = async () => ({
+    data: { success: true, data: { id: 999, status: 'diproses' } },
+  });
+
+  store.setSellerNote(5, 'Es batu sedikit saja');
+  assert.strictEqual(store.getSellerNote(5), 'Es batu sedikit saja');
+
+  await store.checkout(303);
+
+  // Catatan untuk toko 5 harus terhapus setelah sukses checkout
+  assert.strictEqual(store.getSellerNote(5), '');
+});

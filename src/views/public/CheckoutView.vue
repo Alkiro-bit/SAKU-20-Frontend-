@@ -116,6 +116,24 @@ async function handleSimulatePaid() {
           </div>
         </section>
 
+        <section v-if="activeGroup" class="note-card">
+          <div class="note-header">
+            <span class="note-title">
+              <Icon icon="mdi:note-text-outline" width="18" height="18" />
+              Catatan untuk Penjual
+            </span>
+            <span class="char-count">{{ (cartStore.getSellerNote(activeGroup.store_id) || '').length }}/500</span>
+          </div>
+          <textarea
+            class="note-textarea"
+            maxlength="500"
+            :value="cartStore.getSellerNote(activeGroup.store_id)"
+            @input="cartStore.setSellerNote(activeGroup.store_id, $event.target.value)"
+            placeholder="Contoh: Tidak pedas, saus dipisah"
+            rows="2"
+          />
+        </section>
+
         <p v-if="error" class="checkout-error" role="alert">{{ error }}</p>
 
         <div class="action-bar">
@@ -312,5 +330,53 @@ async function handleSimulatePaid() {
 .pay-btn:disabled {
   opacity: 0.7;
   cursor: wait;
+}
+
+.note-card {
+  background-color: var(--color-surface);
+  border-radius: 10px;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.12);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.note-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-family-brand);
+  font-weight: var(--font-weight-medium);
+  font-size: 16px;
+  color: var(--color-text);
+}
+
+.char-count {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.note-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  resize: vertical;
+}
+
+.note-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 </style>
