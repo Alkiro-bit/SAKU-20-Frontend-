@@ -3,15 +3,17 @@ import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Icon } from '@iconify/vue';
 import { useAuthStore } from '@/stores/auth';
+import { getApiErrorMessage, getApiValidationErrors } from '@/services/api';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
-const email = ref('');
+const nisNip = ref('');
 const password = ref('');
 const isSubmitting = ref(false);
 const formError = ref('');
+const fieldErrors = ref({});
 
 function getRedirectPath() {
   const redirect = route.query.redirect;
@@ -20,23 +22,18 @@ function getRedirectPath() {
     : '/';
 }
 
-function getErrorMessage(error) {
-  const message = error?.response?.data?.message;
-  return typeof message === 'string' && message
-    ? message
-    : 'Login gagal. Periksa email dan password Anda, lalu coba lagi.';
-}
-
 async function handleSubmit() {
   if (isSubmitting.value) return;
 
   isSubmitting.value = true;
   formError.value = '';
+  fieldErrors.value = {};
 
   try {
-    await authStore.login(email.value, password.value);
+    await authStore.login(nisNip.value, password.value);
   } catch (error) {
-    formError.value = getErrorMessage(error);
+    fieldErrors.value = getApiValidationErrors(error);
+    formError.value = getApiErrorMessage(error, 'Login gagal. Periksa NIS/NIP dan password Anda, lalu coba lagi.');
     isSubmitting.value = false;
     return;
   }
@@ -56,22 +53,24 @@ async function handleSubmit() {
             <Icon icon="bx:arrow-back" width="24" height="24" />
           </router-link>
         </div>
-        <p>Please sign in or register a new account</p>
+        <p>Masuk dengan NIS/NIP yang terdaftar di sekolah</p>
       </header>
 
       <form class="auth-form" @submit.prevent="handleSubmit">
         <div class="auth-fields">
           <div class="auth-field">
-            <label for="login-email">Email</label>
+            <label for="login-nis-nip">NIS/NIP</label>
             <input
-              id="login-email"
-              v-model.trim="email"
-              name="email"
-              type="email"
+              id="login-nis-nip"
+              v-model.trim="nisNip"
+              name="nis_nip"
+              type="text"
+              inputmode="numeric"
               autocomplete="username"
-              placeholder="Enter your email"
+              placeholder="Masukkan NIS atau NIP"
               required
             />
+            <p v-if="fieldErrors.nis_nip" class="auth-error">{{ fieldErrors.nis_nip[0] }}</p>
           </div>
           <div class="auth-field">
             <label for="login-password">Password</label>
@@ -81,9 +80,10 @@ async function handleSubmit() {
               name="password"
               type="password"
               autocomplete="current-password"
-              placeholder="Enter your password"
+              placeholder="Masukkan password"
               required
             />
+            <p v-if="fieldErrors.password" class="auth-error">{{ fieldErrors.password[0] }}</p>
           </div>
         </div>
 
@@ -93,8 +93,8 @@ async function handleSubmit() {
             {{ isSubmitting ? 'Signing in…' : 'Login' }}
           </button>
           <p class="auth-switch">
-            <span>Don't have an account?</span>
-            <router-link to="/register">Register here</router-link>
+            <span>Belum punya akun?</span>
+            <router-link to="/register">Daftar di sini</router-link>
           </p>
         </div>
       </form>

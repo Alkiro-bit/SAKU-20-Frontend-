@@ -7,7 +7,7 @@ const p = {
   cireng: { id: 3, storeId: 2, name: 'Cireng', price: 6000, category: 'Makanan', image: img('photo-1541592106381-b31e9677c0e5') },
   kapalApi: { id: 4, storeId: 2, name: 'Kapal Api', price: 7000, category: 'Minuman', image: img('photo-1514432324607-a09d9b4aefdd') },
   doritos: { id: 5, storeId: 2, name: 'Doritos', price: 7000, category: 'Makanan', image: img('photo-1566478989037-eec170784d0b') },
-  golda: { id: 6, storeId: 2, name: 'Golda', price: 8000, category: 'Minuman', image: img('photo-1514432324607-a09d9b4aefdd') },
+  golda: { id: 6, storeId: 2, name: 'Golda', price: 4000, category: 'Minuman', image: img('photo-1514432324607-a09d9b4aefdd') },
   goodDay: { id: 7, storeId: 3, name: 'GoodDay', price: 8000, category: 'Minuman', image: img('photo-1541592106381-b31e9677c0e5') },
   makaroni: { id: 8, storeId: 4, name: 'Makaroni Kongz', price: 6000, category: 'Makanan', image: img('photo-1566478989037-eec170784d0b') },
 };

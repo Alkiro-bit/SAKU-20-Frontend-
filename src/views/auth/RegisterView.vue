@@ -3,15 +3,19 @@ import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Icon } from '@iconify/vue';
 import { useAuthStore } from '@/stores/auth';
+import { getApiErrorMessage, getApiValidationErrors } from '@/services/api';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
-const email = ref('');
+const nisNip = ref('');
+const name = ref('');
 const password = ref('');
+const passwordConfirmation = ref('');
 const isSubmitting = ref(false);
 const formError = ref('');
+const fieldErrors = ref({});
 
 function getRedirectPath() {
   const redirect = route.query.redirect;
@@ -20,23 +24,23 @@ function getRedirectPath() {
     : '/';
 }
 
-function getErrorMessage(error) {
-  const message = error?.response?.data?.message;
-  return typeof message === 'string' && message
-    ? message
-    : 'Registrasi gagal. Periksa data Anda, lalu coba lagi.';
-}
-
 async function handleSubmit() {
   if (isSubmitting.value) return;
 
   isSubmitting.value = true;
   formError.value = '';
+  fieldErrors.value = {};
 
   try {
-    await authStore.register({ email: email.value, password: password.value });
+    await authStore.register({
+      nis_nip: nisNip.value,
+      name: name.value,
+      password: password.value,
+      password_confirmation: passwordConfirmation.value,
+    });
   } catch (error) {
-    formError.value = getErrorMessage(error);
+    fieldErrors.value = getApiValidationErrors(error);
+    formError.value = getApiErrorMessage(error, 'Registrasi gagal. Periksa data Anda, lalu coba lagi.');
     isSubmitting.value = false;
     return;
   }
@@ -56,22 +60,37 @@ async function handleSubmit() {
             <Icon icon="bx:arrow-back" width="24" height="24" />
           </router-link>
         </div>
-        <p>Register a new account</p>
+        <p>Daftar menggunakan NIS/NIP yang terdaftar di sekolah</p>
       </header>
 
       <form class="auth-form" @submit.prevent="handleSubmit">
         <div class="auth-fields">
           <div class="auth-field">
-            <label for="register-email">Email</label>
+            <label for="register-nis-nip">NIS/NIP</label>
             <input
-              id="register-email"
-              v-model.trim="email"
-              name="email"
-              type="email"
-              autocomplete="email"
-              placeholder="Enter your email"
+              id="register-nis-nip"
+              v-model.trim="nisNip"
+              name="nis_nip"
+              type="text"
+              inputmode="numeric"
+              autocomplete="username"
+              placeholder="Masukkan NIS atau NIP"
               required
             />
+            <p v-if="fieldErrors.nis_nip" class="auth-error">{{ fieldErrors.nis_nip[0] }}</p>
+          </div>
+          <div class="auth-field">
+            <label for="register-name">Nama Lengkap</label>
+            <input
+              id="register-name"
+              v-model.trim="name"
+              name="name"
+              type="text"
+              autocomplete="name"
+              placeholder="Masukkan nama lengkap"
+              required
+            />
+            <p v-if="fieldErrors.name" class="auth-error">{{ fieldErrors.name[0] }}</p>
           </div>
           <div class="auth-field">
             <label for="register-password">Password</label>
@@ -81,7 +100,20 @@ async function handleSubmit() {
               name="password"
               type="password"
               autocomplete="new-password"
-              placeholder="Enter your password"
+              placeholder="Minimal 8 karakter"
+              required
+            />
+            <p v-if="fieldErrors.password" class="auth-error">{{ fieldErrors.password[0] }}</p>
+          </div>
+          <div class="auth-field">
+            <label for="register-password-confirmation">Konfirmasi Password</label>
+            <input
+              id="register-password-confirmation"
+              v-model="passwordConfirmation"
+              name="password_confirmation"
+              type="password"
+              autocomplete="new-password"
+              placeholder="Ulangi password"
               required
             />
           </div>
@@ -92,6 +124,10 @@ async function handleSubmit() {
           <button class="auth-submit" type="submit" :disabled="isSubmitting">
             {{ isSubmitting ? 'Registering…' : 'Register' }}
           </button>
+          <p class="auth-switch">
+            <span>Sudah punya akun?</span>
+            <router-link to="/login">Login di sini</router-link>
+          </p>
         </div>
       </form>
     </section>
@@ -123,7 +159,6 @@ async function handleSubmit() {
 }
 
 .auth-card--register {
-  min-height: 340px;
   justify-content: space-between;
 }
 
@@ -265,6 +300,35 @@ async function handleSubmit() {
 .auth-submit:disabled {
   cursor: wait;
   opacity: 0.7;
+}
+
+.auth-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  font-size: 14px;
+  line-height: normal;
+  text-align: center;
+}
+
+.auth-switch a {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+  text-underline-offset: 2px;
+}
+
+.auth-switch a:hover {
+  text-decoration: underline;
+}
+
+.auth-switch a:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .auth-error {
