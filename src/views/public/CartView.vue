@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Icon } from '@iconify/vue';
 import { useCartStore } from '@/stores/cart';
@@ -12,7 +12,97 @@ const cartStore = useCartStore();
 const error = ref('');
 const updatingItem = ref(null);
 const isSubmitting = ref(false);
-const showStoreSelectModal = ref(false);
+const showSelectionWarning = ref(false);
+const selectedItemIds = ref(loadSelectedItemIds());
+
+function loadSelectedItemIds() {
+  try {
+    const stored = sessionStorage.getItem('cart_selected_item_ids');
+    return stored ? JSON.parse(stored).map(Number).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSelectedItemIds() {
+  if (selectedItemIds.value.length > 0) {
+    sessionStorage.setItem('cart_selected_item_ids', JSON.stringify(selectedItemIds.value));
+  } else {
+    sessionStorage.removeItem('cart_selected_item_ids');
+  }
+}
+
+function resetSelection() {
+  selectedItemIds.value = [];
+  sessionStorage.removeItem('cart_selected_item_ids');
+}
+
+function closeSelectionWarning() {
+  showSelectionWarning.value = false;
+  resetSelection();
+}
+
+const selectedItems = computed(() => cartStore.items.filter((item) => selectedItemIds.value.includes(Number(item.id))));
+const selectedStoreIds = computed(() => [...new Set(selectedItems.value.map((item) => item.store_id))]);
+const selectedTotal = computed(() => selectedItems.value.reduce((sum, item) => sum + item.price * item.quantity, 0));
+const hasSelection = computed(() => selectedItems.value.length > 0);
+
+function isItemSelected(item) {
+  return selectedItemIds.value.includes(Number(item.id));
+}
+
+function isStoreSelected(group) {
+  return group.items.length > 0 && group.items.every(isItemSelected);
+}
+
+function isStorePartiallySelected(group) {
+  const selectedCount = group.items.filter(isItemSelected).length;
+  return selectedCount > 0 && selectedCount < group.items.length;
+}
+
+function toggleItem(item, event) {
+  const next = selectedItemIds.value.filter((id) => id !== Number(item.id));
+  if (!isItemSelected(item)) {
+    if (selectedStoreIds.value.length > 0 && !selectedStoreIds.value.includes(item.store_id)) {
+      if (event?.target) event.target.checked = false;
+      closeSelectionWarning();
+      showSelectionWarning.value = true;
+      return;
+    }
+    next.push(Number(item.id));
+  }
+  selectedItemIds.value = next;
+  saveSelectedItemIds();
+}
+
+function toggleStore(group, event) {
+  if (isStoreSelected(group)) {
+    selectedItemIds.value = selectedItemIds.value.filter((id) => !group.items.some((item) => Number(item.id) === id));
+  } else {
+    if (selectedStoreIds.value.length > 0 && !selectedStoreIds.value.includes(group.store_id)) {
+      if (event?.target) event.target.checked = false;
+      closeSelectionWarning();
+      showSelectionWarning.value = true;
+      return;
+    }
+    const groupIds = group.items.map((item) => Number(item.id));
+    selectedItemIds.value = [...new Set([...selectedItemIds.value, ...groupIds])];
+  }
+  saveSelectedItemIds();
+}
+
+watch(error, (val) => {
+  if (val) resetSelection();
+});
+
+watch(() => cartStore.items.map((item) => Number(item.id)), (ids) => {
+  const validIds = new Set(ids);
+  const next = selectedItemIds.value.filter((id) => validIds.has(id));
+  if (next.length !== selectedItemIds.value.length) {
+    selectedItemIds.value = next;
+    saveSelectedItemIds();
+  }
+}, { immediate: true });
 
 function formatRupiah(value) {
   if (!value && value !== 0) return 'Rp 0';
@@ -57,19 +147,21 @@ async function handleRemove(item) {
   }
 }
 
-async function processCheckout(cartId) {
+async function processCheckout(cartId, itemIds = null) {
   if (isSubmitting.value) return;
   isSubmitting.value = true;
   error.value = '';
 
   try {
-    const order = await cartStore.checkout(cartId);
+    const order = await cartStore.checkout(cartId, undefined, itemIds);
+    resetSelection();
     if (order?.id) {
       router.replace({ path: `/orders/${order.id}`, query: { new: '1' } });
     } else {
       router.replace('/orders');
     }
   } catch (e) {
+    resetSelection();
     error.value = getApiErrorMessage(e, 'Checkout failed. Try again.');
   } finally {
     isSubmitting.value = false;
@@ -78,22 +170,19 @@ async function processCheckout(cartId) {
 
 async function handleCheckout() {
   error.value = '';
-  if (cartStore.isEmpty) {
-    error.value = 'Cart is empty. Cannot proceed to checkout.';
+  if (!hasSelection.value) {
+    error.value = 'Pilih minimal satu produk untuk checkout.';
+    return;
+  }
+  if (selectedStoreIds.value.length > 1) {
+    resetSelection();
+    showSelectionWarning.value = true;
     return;
   }
 
-  const groups = cartStore.cartGroups;
-  if (groups.length === 1) {
-    await processCheckout(groups[0].cart_id);
-  } else if (groups.length > 1) {
-    showStoreSelectModal.value = true;
-  }
-}
-
-async function handleSelectStore(cartId) {
-  showStoreSelectModal.value = false;
-  await processCheckout(cartId);
+  const storeId = selectedStoreIds.value[0];
+  const group = cartStore.cartGroups.find((item) => item.store_id === storeId);
+  await processCheckout(group?.cart_id, selectedItemIds.value);
 }
 
 onMounted(async () => {
@@ -132,8 +221,17 @@ onMounted(async () => {
           class="cart-card"
         >
           <div class="store-header">
-            <div class="store-info">
+            <label class="selection-control store-selection">
+              <input
+                type="checkbox"
+                :checked="isStoreSelected(group)"
+                :ref="(element) => { if (element) element.indeterminate = isStorePartiallySelected(group); }"
+                @change="toggleStore(group, $event)"
+                :aria-label="`Pilih semua produk dari ${group.store_name}`"
+              />
               <Icon icon="mdi:store" width="20" height="20" />
+            </label>
+            <div class="store-info">
               <span class="store-name">{{ group.store_name }}</span>
             </div>
             <span class="store-subtotal">{{ formatRupiah(group.subtotal) }}</span>
@@ -146,6 +244,14 @@ onMounted(async () => {
               class="product-row"
             >
               <div class="product-left">
+                <label class="selection-control">
+                  <input
+                    type="checkbox"
+                    :checked="isItemSelected(item)"
+                    @change="toggleItem(item, $event)"
+                    :aria-label="`Pilih ${item.name}`"
+                  />
+                </label>
                 <div class="product-thumb">
                   <img :src="item.image" :alt="item.name" loading="lazy" />
                 </div>
@@ -215,69 +321,36 @@ onMounted(async () => {
     <div v-if="!cartStore.isEmpty" class="checkout-bar">
       <div class="total-info">
         <span class="total-label">Total:</span>
-        <span class="total-value">{{ formatRupiah(cartStore.totalPrice) }}</span>
+        <span class="total-value">{{ formatRupiah(selectedTotal) }}</span>
       </div>
       <button
         type="button"
         class="checkout-btn"
-        :disabled="cartStore.isEmpty || isSubmitting"
+        :disabled="!hasSelection || isSubmitting"
         @click="handleCheckout"
       >
-        {{ isSubmitting ? 'Processing…' : 'Checkout' }}
+        {{ isSubmitting ? 'Processing…' : `Checkout (${selectedItems.length})` }}
       </button>
     </div>
 
-    <!-- Store Selection Modal for Multi-store Checkout -->
     <div
-      v-if="showStoreSelectModal"
+      v-if="showSelectionWarning"
       class="modal-backdrop"
-      @click.self="showStoreSelectModal = false"
+      @click.self="closeSelectionWarning"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="modal-title"
+      aria-labelledby="selection-warning-title"
     >
       <div class="modal-card">
         <div class="modal-header">
-          <h2 id="modal-title" class="modal-title">Pilih Toko untuk Checkout</h2>
-          <button
-            type="button"
-            class="modal-close-btn"
-            @click="showStoreSelectModal = false"
-            aria-label="Tutup dialog"
-          >
+          <h2 id="selection-warning-title" class="modal-title">Produk berbeda toko</h2>
+          <button type="button" class="modal-close-btn" @click="closeSelectionWarning" aria-label="Tutup dialog">
             <Icon icon="akar-icons:cross" width="16" height="16" />
           </button>
         </div>
-
-        <p class="modal-warning">
-          Checkout hanya dapat dilakukan untuk satu toko. Pilih toko yang ingin diproses.
-        </p>
-
-        <div class="modal-store-list">
-          <button
-            v-for="group in cartStore.cartGroups"
-            :key="'modal-store-' + group.store_id"
-            type="button"
-            class="modal-store-item"
-            :disabled="isSubmitting"
-            @click="handleSelectStore(group.cart_id)"
-          >
-            <div class="modal-store-left">
-              <span class="modal-store-name">{{ group.store_name }}</span>
-              <span class="modal-store-detail">{{ group.total_quantity }} item • {{ formatRupiah(group.subtotal) }}</span>
-            </div>
-            <span class="modal-select-tag">Pilih</span>
-          </button>
-        </div>
-
+        <p class="modal-warning">Checkout hanya bisa dilakukan dari satu toko. Selesaikan checkout toko ini terlebih dahulu, lalu pilih toko lain.</p>
         <div class="modal-footer">
-          <button
-            type="button"
-            class="modal-cancel-btn"
-            @click="showStoreSelectModal = false"
-          >
-            Batal
-          </button>
+          <button type="button" class="modal-cancel-btn" @click="closeSelectionWarning">Mengerti</button>
         </div>
       </div>
     </div>
@@ -357,6 +430,24 @@ onMounted(async () => {
 .store-info {
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.selection-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.selection-control input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.store-selection {
   gap: 8px;
 }
 

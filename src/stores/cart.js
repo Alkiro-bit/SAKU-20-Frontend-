@@ -341,7 +341,7 @@ export const useCartStore = defineStore('cart', {
       this.removeGroup(cartId);
     },
 
-    async checkout(targetCartId = null, noteOverride = undefined) {
+    async checkout(targetCartId = null, noteOverride = undefined, selectedCartItemIds = null) {
       const targetGroup = targetCartId
         ? this.groups.find((g) => g.cart_id === targetCartId || g.cartId === targetCartId)
         : this.cartGroups[0];
@@ -374,7 +374,9 @@ export const useCartStore = defineStore('cart', {
       this.isSubmitting = true;
       try {
         const payload = {};
-        if (cartId) {
+        if (Array.isArray(selectedCartItemIds) && selectedCartItemIds.length > 0) {
+          payload.cart_item_ids = selectedCartItemIds;
+        } else if (cartId) {
           payload.cart_id = cartId;
         } else if (storeId) {
           payload.store_id = storeId;
@@ -384,7 +386,23 @@ export const useCartStore = defineStore('cart', {
         }
 
         const res = await apiClient.post('/orders', payload);
-        if (cartId) {
+        if (Array.isArray(selectedCartItemIds) && selectedCartItemIds.length > 0 && targetGroup) {
+          const selectedIds = new Set(selectedCartItemIds.map(Number));
+          const remainingItems = targetGroup.items.filter((item) => !selectedIds.has(Number(item.id)));
+          if (remainingItems.length > 0) {
+            this.upsertGroup(createStoreGroup({
+              id: targetGroup.cart_id,
+              store_id: targetGroup.store_id,
+              store_name: targetGroup.store_name,
+              items: remainingItems,
+              seller_note: targetGroup.seller_note,
+            }));
+          } else if (cartId) {
+            this.removeGroup(cartId);
+          } else if (storeId) {
+            this.removeGroup(null, storeId);
+          }
+        } else if (cartId) {
           this.removeGroup(cartId);
         } else if (storeId) {
           this.removeGroup(null, storeId);

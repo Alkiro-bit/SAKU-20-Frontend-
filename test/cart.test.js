@@ -167,7 +167,31 @@ test('4. checkout hanya mengirim satu cart_id', async () => {
   assert.deepStrictEqual(postRequests[0].data, { cart_id: 202 });
 });
 
-test('5. cart toko lain tetap ada setelah checkout', async () => {
+test('5. checkout produk terpilih mengirim cart_item_ids dan menyisakan item lain', async () => {
+  const store = setupTestCartStore();
+  store.upsertGroup(createStoreGroup({
+    id: 101,
+    store_id: 1,
+    store_name: 'Toko Pilihan',
+    items: [
+      { id: 1, product_id: 11, name: 'Dipilih', price: 5000, quantity: 1 },
+      { id: 2, product_id: 12, name: 'Disimpan', price: 7000, quantity: 1 },
+    ],
+  }));
+
+  const postRequests = [];
+  apiClient.post = async (url, data) => {
+    postRequests.push({ url, data });
+    return { data: { success: true, data: { id: 702 } } };
+  };
+
+  await store.checkout(101, undefined, [1]);
+
+  assert.deepStrictEqual(postRequests[0].data, { cart_item_ids: [1] });
+  assert.deepStrictEqual(store.cartGroups[0].items.map((item) => item.id), [2]);
+});
+
+test('6. cart toko lain tetap ada setelah checkout', async () => {
   const store = setupTestCartStore();
 
   store.upsertGroup(
@@ -203,7 +227,7 @@ test('5. cart toko lain tetap ada setelah checkout', async () => {
   assert.strictEqual(store.totalPrice, 20000);
 });
 
-test('6. checkout gagal mengaktifkan kembali tombol', async () => {
+test('8. checkout gagal mengaktifkan kembali tombol', async () => {
   const store = setupTestCartStore();
 
   store.upsertGroup(
@@ -253,7 +277,7 @@ test('6. checkout gagal mengaktifkan kembali tombol', async () => {
   );
 });
 
-test('7. checkout dengan seller_note mengirim field seller_note', async () => {
+test('9. checkout dengan seller_note mengirim field seller_note', async () => {
   const store = setupTestCartStore();
 
   const group = createStoreGroup({
@@ -297,7 +321,7 @@ test('7. checkout dengan seller_note mengirim field seller_note', async () => {
   });
 });
 
-test('8. seller_note melebihi 500 karakter ditolak validasi', async () => {
+test('10. seller_note melebihi 500 karakter ditolak validasi', async () => {
   const store = setupTestCartStore();
 
   const group = createStoreGroup({
@@ -327,7 +351,7 @@ test('8. seller_note melebihi 500 karakter ditolak validasi', async () => {
   );
 });
 
-test('9. seller_note terhapus setelah checkout berhasil', async () => {
+test('11. seller_note terhapus setelah checkout berhasil', async () => {
   const store = setupTestCartStore();
 
   const group = createStoreGroup({
