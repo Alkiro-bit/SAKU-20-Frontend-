@@ -38,7 +38,28 @@ apiClient.interceptors.response.use(
 // Format error backend: { success: false, message, errors? }
 export function getApiErrorMessage(error, fallback = 'Terjadi kesalahan. Coba lagi.') {
   const message = error?.response?.data?.message;
-  return typeof message === 'string' && message ? message : fallback;
+  if (typeof message === 'string' && message.trim()) {
+    return message;
+  }
+
+  const errors = error?.response?.data?.errors;
+  if (errors && typeof errors === 'object') {
+    const errorList = Object.values(errors).flat().filter(Boolean);
+    if (errorList.length > 0) return errorList.join(', ');
+  }
+
+  const status = error?.response?.status;
+  if (status === 401) {
+    return 'Sesi Anda telah berakhir. Silakan login kembali.';
+  }
+  if (status === 409) {
+    return 'Terjadi konflik data (stok habis, toko tutup, atau pesanan sudah diproses).';
+  }
+  if (status === 422) {
+    return 'Data yang dikirim tidak valid. Periksa kembali pesanan Anda.';
+  }
+
+  return fallback;
 }
 
 export function getApiValidationErrors(error) {

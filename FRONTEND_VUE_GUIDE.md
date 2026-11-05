@@ -208,7 +208,7 @@ Format respons backend konsisten:
 - `GET /products/:id` → Detail produk
 
 ### 5.3 Keranjang Belanja (`/cart`)
-*Catatan: 1 keranjang terikat pada 1 toko. Frontend harus mengingatkan user jika menambahkan produk dari toko berbeda.*
+*Catatan: Backend menggunakan keranjang terpisah untuk setiap pasangan (user_id, store_id). Frontend menggabungkan tampilan seluruh cart toko dalam satu halaman `/cart`. Saat checkout, proses dilakukan per-toko.*
 - `GET /cart?store_id=:store_id` → Ambil isi keranjang pada toko tsb (response menyertakan `id` cart)
 - `POST /cart/items` — Body: `{ store_id, product_id, quantity }`
 - `PATCH /cart/items/:item_id` — Body: `{ quantity }`
@@ -343,8 +343,17 @@ onMounted(start);
 
 ## 8. Aturan Bisnis & UI/UX Khusus
 
-1. **Aturan 1 Toko 1 Keranjang**:
-   - Jika keranjang sudah berisi item dari Toko A, lalu pengguna menekan "Tambah ke Keranjang" pada produk Toko B: Tampilkan modal konfirmasi *"Keranjang Anda berisi produk dari toko lain. Ingin mengosongkan keranjang dan belanja di toko ini?"*. Jika Ya, panggil `DELETE /cart/:id` (pakai id cart lama, didapat dari `GET /cart` sebelumnya) lalu `POST /cart/items`.
+1. **Aturan Multi-Toko pada Keranjang & Checkout**:
+   - Backend memisahkan cart per `(user_id, store_id)`.
+   - Frontend menampilkan semua cart toko dalam satu halaman `/cart` (dikelompokkan per toko).
+   - Menambahkan produk dari toko lain tidak menghapus cart toko sebelumnya.
+   - Saat checkout:
+     - Jika cart kosong, tampilkan pesan error.
+     - Jika hanya 1 toko, langsung proses checkout dengan `cart_id` toko tersebut.
+     - Jika terdapat lebih dari 1 toko, tampilkan popup modal pemilihan toko dengan pesan:
+       *"Checkout hanya dapat dilakukan untuk satu toko. Pilih toko yang ingin diproses."*
+     - Hanya 1 request `POST /orders` dengan `{ cart_id: selectedCartId }` yang dikirim.
+     - Cart toko lain tetap tersimpan, dan hanya cart toko yang berhasil diproses yang dihapus dari state.
 
 2. **Checkout "Simulate Paid" — wajib ada proteksi double-submit**:
    - Sistem SAKU 20 tidak menggunakan gateway pembayaran pihak ketiga. Begitu klik "Simulate Paid", **disable tombol segera** (sebelum response API datang) untuk mencegah klik ganda mengirim 2 request `POST /orders` untuk cart yang sama. Backend juga sudah punya proteksi serupa (cart dikunci + dicek masih berisi), tapi disable di frontend tetap wajib supaya UX tidak membingungkan (user tidak lihat 2x proses berjalan).

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --import ./test/register.js --test test/cart.test.js"
   },
   "dependencies": {
     "@iconify/vue": "^5.0.5",

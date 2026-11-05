@@ -11,6 +11,8 @@ const router = useRouter();
 const cartStore = useCartStore();
 const error = ref('');
 const updatingItem = ref(null);
+const isSubmitting = ref(false);
+const showStoreSelectModal = ref(false);
 
 function formatRupiah(value) {
   if (!value && value !== 0) return 'Rp 0';
@@ -24,7 +26,7 @@ function formatRupiah(value) {
 async function handleIncrement(item) {
   updatingItem.value = item.id;
   try {
-    await cartStore.updateQuantity(item.id, item.quantity + 1);
+    await cartStore.updateQuantity(item.id, item.quantity + 1, item.store_id);
   } catch (e) {
     error.value = getApiErrorMessage(e);
   } finally {
@@ -36,7 +38,7 @@ async function handleDecrement(item) {
   if (item.quantity <= 1) return;
   updatingItem.value = item.id;
   try {
-    await cartStore.updateQuantity(item.id, item.quantity - 1);
+    await cartStore.updateQuantity(item.id, item.quantity - 1, item.store_id);
   } catch (e) {
     error.value = getApiErrorMessage(e);
   } finally {
@@ -47,7 +49,7 @@ async function handleDecrement(item) {
 async function handleRemove(item) {
   updatingItem.value = item.id;
   try {
-    await cartStore.removeItem(item.id);
+    await cartStore.removeItem(item.id, item.store_id);
   } catch (e) {
     error.value = getApiErrorMessage(e);
   } finally {
@@ -55,18 +57,50 @@ async function handleRemove(item) {
   }
 }
 
-function handleCheckout() {
-  if (cartStore.isEmpty) return;
-  router.push('/checkout');
+async function processCheckout(cartId) {
+  if (isSubmitting.value) return;
+  isSubmitting.value = true;
+  error.value = '';
+
+  try {
+    const order = await cartStore.checkout(cartId);
+    if (order?.id) {
+      router.replace({ path: `/orders/${order.id}`, query: { new: '1' } });
+    } else {
+      router.replace('/orders');
+    }
+  } catch (e) {
+    error.value = getApiErrorMessage(e, 'Checkout gagal. Coba lagi.');
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+async function handleCheckout() {
+  error.value = '';
+  if (cartStore.isEmpty) {
+    error.value = 'Keranjang kosong. Tidak dapat melakukan checkout.';
+    return;
+  }
+
+  const groups = cartStore.cartGroups;
+  if (groups.length === 1) {
+    await processCheckout(groups[0].cart_id);
+  } else if (groups.length > 1) {
+    showStoreSelectModal.value = true;
+  }
+}
+
+async function handleSelectStore(cartId) {
+  showStoreSelectModal.value = false;
+  await processCheckout(cartId);
 }
 
 onMounted(async () => {
-  if (cartStore.storeId) {
-    try {
-      await cartStore.fetchCart();
-    } catch (e) {
-      error.value = getApiErrorMessage(e, 'Gagal memuat keranjang.');
-    }
+  try {
+    await cartStore.fetchAllCarts();
+  } catch (e) {
+    error.value = getApiErrorMessage(e, 'Gagal memuat keranjang.');
   }
 });
 </script>
@@ -92,15 +126,22 @@ onMounted(async () => {
       </div>
 
       <div v-else class="cart-list">
-        <div class="cart-card">
+        <div
+          v-for="group in cartStore.cartGroups"
+          :key="'store-cart-' + group.store_id"
+          class="cart-card"
+        >
           <div class="store-header">
-            <Icon icon="mdi:store" width="20" height="20" />
-            <span class="store-name">{{ cartStore.storeName }}</span>
+            <div class="store-info">
+              <Icon icon="mdi:store" width="20" height="20" />
+              <span class="store-name">{{ group.store_name }}</span>
+            </div>
+            <span class="store-subtotal">{{ formatRupiah(group.subtotal) }}</span>
           </div>
 
           <div class="product-list">
             <div
-              v-for="item in cartStore.items"
+              v-for="item in group.items"
               :key="'item-' + item.id"
               class="product-row"
             >
@@ -161,11 +202,66 @@ onMounted(async () => {
       <button
         type="button"
         class="checkout-btn"
-        :disabled="cartStore.isEmpty"
+        :disabled="cartStore.isEmpty || isSubmitting"
         @click="handleCheckout"
       >
-        Checkout
+        {{ isSubmitting ? 'Memproses…' : 'Checkout' }}
       </button>
+    </div>
+
+    <!-- Store Selection Modal for Multi-store Checkout -->
+    <div
+      v-if="showStoreSelectModal"
+      class="modal-backdrop"
+      @click.self="showStoreSelectModal = false"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="modal-title" class="modal-title">Pilih Toko untuk Checkout</h2>
+          <button
+            type="button"
+            class="modal-close-btn"
+            @click="showStoreSelectModal = false"
+            aria-label="Tutup dialog"
+          >
+            <Icon icon="akar-icons:cross" width="16" height="16" />
+          </button>
+        </div>
+
+        <p class="modal-warning">
+          Checkout hanya dapat dilakukan untuk satu toko. Pilih toko yang ingin diproses.
+        </p>
+
+        <div class="modal-store-list">
+          <button
+            v-for="group in cartStore.cartGroups"
+            :key="'modal-store-' + group.store_id"
+            type="button"
+            class="modal-store-item"
+            :disabled="isSubmitting"
+            @click="handleSelectStore(group.cart_id)"
+          >
+            <div class="modal-store-left">
+              <span class="modal-store-name">{{ group.store_name }}</span>
+              <span class="modal-store-detail">{{ group.total_quantity }} item • {{ formatRupiah(group.subtotal) }}</span>
+            </div>
+            <span class="modal-select-tag">Pilih</span>
+          </button>
+        </div>
+
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="modal-cancel-btn"
+            @click="showStoreSelectModal = false"
+          >
+            Batal
+          </button>
+        </div>
+      </div>
     </div>
 
     <BottomNav />
@@ -232,10 +328,24 @@ onMounted(async () => {
 .store-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   padding: 12px 14px;
   border-bottom: 0.5px solid #d1d5db;
   background-color: #fafbfc;
+}
+
+.store-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.store-subtotal {
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+  color: var(--color-primary);
 }
 
 .store-name {
@@ -414,5 +524,131 @@ onMounted(async () => {
 .checkout-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Modal styles */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 100;
+}
+
+.modal-card {
+  background-color: var(--color-surface);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  padding: 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-family: var(--font-family-brand);
+  font-weight: var(--font-weight-medium);
+  font-size: 18px;
+  color: var(--color-text);
+}
+
+.modal-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-text-muted);
+}
+
+.modal-warning {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+  color: #b42318;
+  background-color: #fef3f2;
+  border: 1px solid #fee4e2;
+  border-radius: 8px;
+  padding: 10px 12px;
+  line-height: 1.4;
+}
+
+.modal-store-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.modal-store-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-background);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.modal-store-item:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background-color: rgba(30, 144, 255, 0.04);
+}
+
+.modal-store-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modal-store-name {
+  font-family: var(--font-family-brand);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+}
+
+.modal-store-detail {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.modal-select-tag {
+  font-family: var(--font-family-brand);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+  color: var(--color-primary);
+  padding: 4px 10px;
+  border: 1px solid var(--color-primary);
+  border-radius: 6px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.modal-cancel-btn {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+  padding: 8px 16px;
+  border-radius: 6px;
+  color: var(--color-text-muted);
 }
 </style>

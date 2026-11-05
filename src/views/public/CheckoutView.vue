@@ -11,11 +11,20 @@ const router = useRouter();
 const cartStore = useCartStore();
 const isSubmitting = ref(false);
 const error = ref('');
+const selectedStoreId = ref(null);
 
 const BMS_PER_ITEM = 1000;
 
-const totalItems = computed(() => cartStore.itemCount);
-const subtotal = computed(() => cartStore.totalPrice);
+const activeGroup = computed(() => {
+  if (selectedStoreId.value) {
+    const found = cartStore.cartGroups.find((g) => g.store_id === selectedStoreId.value);
+    if (found) return found;
+  }
+  return cartStore.cartGroups[0] || null;
+});
+
+const totalItems = computed(() => activeGroup.value?.total_quantity || 0);
+const subtotal = computed(() => activeGroup.value?.subtotal || 0);
 const commission = computed(() => totalItems.value * BMS_PER_ITEM);
 const grandTotal = computed(() => subtotal.value + commission.value);
 
@@ -29,14 +38,19 @@ function formatRupiah(value) {
 
 async function handleSimulatePaid() {
   if (isSubmitting.value) return;
+  if (!activeGroup.value?.cart_id) {
+    error.value = 'Keranjang kosong. Tidak bisa checkout.';
+    return;
+  }
   isSubmitting.value = true;
   error.value = '';
 
   try {
-    const order = await cartStore.checkout();
+    const order = await cartStore.checkout(activeGroup.value.cart_id);
     router.replace({ path: `/orders/${order.id}`, query: { new: '1' } });
   } catch (e) {
     error.value = getApiErrorMessage(e, 'Checkout gagal. Coba lagi.');
+  } finally {
     isSubmitting.value = false;
   }
 }
@@ -62,10 +76,26 @@ async function handleSimulatePaid() {
       </div>
 
       <template v-else>
-        <section class="summary-card">
-          <h2 class="card-title">{{ cartStore.storeName }}</h2>
+        <div v-if="cartStore.cartGroups.length > 1" class="store-selector">
+          <p class="selector-label">Pilih toko yang ingin diproses:</p>
+          <div class="store-tabs">
+            <button
+              v-for="group in cartStore.cartGroups"
+              :key="group.store_id"
+              type="button"
+              class="store-tab"
+              :class="{ 'is-active': activeGroup?.store_id === group.store_id }"
+              @click="selectedStoreId = group.store_id"
+            >
+              {{ group.store_name }}
+            </button>
+          </div>
+        </div>
+
+        <section v-if="activeGroup" class="summary-card">
+          <h2 class="card-title">{{ activeGroup.store_name }}</h2>
           <div class="summary-items">
-            <div v-for="item in cartStore.items" :key="item.id" class="summary-row">
+            <div v-for="item in activeGroup.items" :key="item.id" class="summary-row">
               <span class="item-name">{{ item.name }} x{{ item.quantity }}</span>
               <span class="item-price">{{ formatRupiah(item.price * item.quantity) }}</span>
             </div>
@@ -157,6 +187,50 @@ async function handleSimulatePaid() {
 .back-link {
   color: var(--color-primary);
   font-weight: var(--font-weight-medium);
+}
+
+.store-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.selector-label {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.store-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.store-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.store-tab {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.store-tab.is-active {
+  background-color: rgba(30, 144, 255, 0.1);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
 }
 
 .summary-card {

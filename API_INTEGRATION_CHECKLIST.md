@@ -208,7 +208,7 @@ npm run build
 
 - Login memakai [`src/stores/auth.js`](./src/stores/auth.js).
 - Request API memakai [`src/services/api.js`](./src/services/api.js).
-- Cart memakai [`src/stores/cart.js`](./src/stores/cart.js).
+- Cart memakai [`src/stores/cart.js`](./src/stores/cart.js) (mendukung multi-toko dalam satu halaman dengan checkout per toko).
 - Detail produk sudah memakai API.
 - Home dan Shop masih memakai data dummy dari [`src/data/products.js`](./src/data/products.js).
 - Route `/products/:id` dan `/cart` memerlukan login.
