@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import { useCartStore } from '@/stores/cart';
+import { products, stores } from '@/data/products';
 
 const route = useRoute();
 const router = useRouter();
@@ -12,48 +13,27 @@ const cartStore = useCartStore();
 
 const productId = computed(() => Number(route.params.id) || 1);
 
-// Mock catalog data
-const catalog = {
-  1: {
-    id: 1,
-    name: 'Es Teh Manis',
-    price: 5000,
-    storeId: 1,
-    storeName: 'JungleFood',
-    description: 'Es teh manis segar diseduh dari daun teh pilihan dengan manis yang pas.',
-    image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=600',
-  },
-  2: {
-    id: 2,
-    name: 'Cireng',
-    price: 5000,
-    storeId: 1,
-    storeName: 'JungleFood',
-    description: 'Cireng yang digoreng dengan penuh kenikmatan dan penuh dengan cinta yang menghasilkan harmoni rasa yang sempurna dalam setiap gigitannya.',
-    image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=600',
-  },
-  3: {
-    id: 3,
-    name: 'Kapal Api',
-    price: 7000,
-    storeId: 2,
-    storeName: 'Meetup Cafe',
-    description: 'Kopi hitam mantap khas Kapal Api, aroma kuat dan rasa nikmat.',
-    image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600',
-  },
-  4: {
-    id: 4,
-    name: 'Indomie Goreng',
-    price: 7000,
-    storeId: 1,
-    storeName: 'JungleFood',
-    description: 'Indomie goreng legendaris disajikan hangat dengan taburan bawang goreng.',
-    image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=600',
-  },
+const defaultDescriptions = {
+  1: 'Es teh manis segar diseduh dari daun teh pilihan dengan manis yang pas.',
+  2: 'Indomie goreng legendaris disajikan hangat dengan taburan bawang goreng.',
+  3: 'Cireng yang digoreng dengan penuh kenikmatan dan penuh dengan cinta yang menghasilkan harmoni rasa yang sempurna dalam setiap gigitannya.',
+  4: 'Kopi hitam mantap khas Kapal Api, aroma kuat dan rasa nikmat.',
+  5: 'Keripik jagung renyah dengan bumbu gurih yang khas dan bikin nagih.',
+  6: 'Kopi susu instan dalam kemasan botol siap minum dengan rasa mantap.',
+  7: 'Kopi instan dengan aroma kopi nikmat dan rasa manis yang pas di lidah.',
+  8: 'Makaroni pedas gurih dengan tekstur renyah yang pas untuk camilan santai.',
 };
 
+const storeMap = Object.fromEntries(stores.map((s) => [s.id, s.name]));
+
 const product = computed(() => {
-  return catalog[productId.value] || catalog[2];
+  const found = Object.values(products).find((p) => p.id === productId.value);
+  const base = found || products.esTeh;
+  return {
+    ...base,
+    storeName: storeMap[base.storeId] || 'Toko SAKU',
+    description: defaultDescriptions[base.id] || 'Produk segar berkualitas dari kantin sekolah.',
+  };
 });
 
 const quantity = ref(1);
