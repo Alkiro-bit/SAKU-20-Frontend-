@@ -6,6 +6,15 @@ import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import { useCartStore } from '@/stores/cart';
 import { products, stores } from '@/data/products';
+import { getLastMainPath } from '@/router';
+
+function handleBack() {
+  if (window.history.length > 1) {
+    router.back();
+  } else {
+    router.push(getLastMainPath());
+  }
+}
 
 const route = useRoute();
 const router = useRouter();
@@ -96,6 +105,14 @@ function handleAddToCart() {
     <main class="main-content">
       <!-- Product Hero Image -->
       <div class="product-hero">
+        <button
+          type="button"
+          class="back-btn"
+          @click="handleBack"
+          aria-label="Kembali"
+        >
+          <Icon icon="bx:arrow-back" width="22" height="22" />
+        </button>
         <img :src="product.image" :alt="product.name" class="hero-image" />
       </div>
 
@@ -174,6 +191,7 @@ function handleAddToCart() {
 }
 
 .product-hero {
+  position: relative;
   width: 100%;
   height: 240px;
   background-color: #f2f2f2;
@@ -181,6 +199,28 @@ function handleAddToCart() {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+}
+
+.back-btn {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.back-btn:active {
+  transform: scale(0.92);
 }
 
 .hero-image {

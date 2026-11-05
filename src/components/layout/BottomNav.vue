@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { Icon } from '@iconify/vue';
+import { getLastMainPath } from '@/router';
 
 const route = useRoute();
 
@@ -14,8 +15,10 @@ const tabs = [
 ];
 
 function isActive(tab) {
-  if (tab.path === '/') return route.path === '/';
-  return route.path.startsWith(tab.path);
+  const currentPath = route.path.startsWith('/products/') ? getLastMainPath() : route.path;
+  const basePath = currentPath.split('?')[0].split('#')[0];
+  if (tab.path === '/') return basePath === '/';
+  return basePath.startsWith(tab.path);
 }
 </script>
 

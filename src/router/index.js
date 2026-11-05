@@ -54,7 +54,17 @@ function currentUser() {
   }
 }
 
-router.beforeEach((to) => {
+let lastMainPath = '/';
+
+export function getLastMainPath() {
+  return lastMainPath;
+}
+
+router.beforeEach((to, from) => {
+  if (from?.fullPath && !from.fullPath.startsWith('/products/')) {
+    lastMainPath = from.fullPath;
+  }
+
   const token = localStorage.getItem('auth_token');
   const userRole = currentUser()?.role;
 
