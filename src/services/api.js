@@ -1,4 +1,5 @@
 import axios from 'axios';
+import router from '@/router';
 
 // Content-Type sengaja tidak di-set global: upload produk mengirim FormData,
 // dan axios perlu menulis boundary multipart sendiri.
@@ -9,24 +10,12 @@ export const apiClient = axios.create({
   },
 });
 
-const GUEST_TOKEN_KEY = 'guest_token';
 const AUTH_TOKEN_KEY = 'auth_token';
-
-export function getGuestToken() {
-  let token = localStorage.getItem(GUEST_TOKEN_KEY);
-  if (!token) {
-    token = crypto.randomUUID();
-    localStorage.setItem(GUEST_TOKEN_KEY, token);
-  }
-  return token;
-}
 
 apiClient.interceptors.request.use((config) => {
   const authToken = localStorage.getItem(AUTH_TOKEN_KEY);
   if (authToken) {
     config.headers.Authorization = 'Bearer ' + authToken;
-  } else {
-    config.headers['X-Guest-Token'] = getGuestToken();
   }
   return config;
 });
@@ -37,8 +26,9 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem(AUTH_TOKEN_KEY);
       localStorage.removeItem('user_data');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      const currentPath = router.currentRoute.value.fullPath;
+      if (currentPath !== '/login') {
+        router.push({ path: '/login', query: { redirect: currentPath } });
       }
     }
     return Promise.reject(error);

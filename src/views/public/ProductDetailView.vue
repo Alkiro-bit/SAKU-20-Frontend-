@@ -1,11 +1,11 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Icon } from '@iconify/vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import { useCartStore } from '@/stores/cart';
-import { products, stores } from '@/data/products';
+import { apiClient, getApiErrorMessage } from '@/services/api';
 import { getLastMainPath } from '@/router';
 
 function handleBack() {
@@ -22,20 +22,26 @@ const cartStore = useCartStore();
 
 const productId = computed(() => Number(route.params.id) || 1);
 
-const storeMap = Object.fromEntries(stores.map((s) => [s.id, s.name]));
-
-const product = computed(() => {
-  const found = Object.values(products).find((p) => p.id === productId.value);
-  const base = found || products.esTeh;
-  return {
-    ...base,
-    storeName: storeMap[base.storeId] || 'Toko SAKU',
-    description: base.description || 'Produk segar berkualitas dari kantin sekolah.',
-  };
-});
-
+const product = ref(null);
+const loading = ref(true);
+const error = ref('');
 const quantity = ref(1);
 const notes = ref('');
+const isAdding = ref(false);
+const addError = ref('');
+
+async function fetchProduct() {
+  loading.value = true;
+  error.value = '';
+  try {
+    const res = await apiClient.get(`/products/${productId.value}`);
+    product.value = res.data.data;
+  } catch (e) {
+    error.value = getApiErrorMessage(e, 'Gagal memuat detail produk.');
+  } finally {
+    loading.value = false;
+  }
+}
 
 function formatRupiah(value) {
   if (!value && value !== 0) return 'Rp 0';
@@ -56,35 +62,21 @@ function decrement() {
   }
 }
 
-function handleAddToCart() {
-  let store = cartStore.stores.find((s) => s.id === product.value.storeId);
-  if (!store) {
-    store = {
-      id: product.value.storeId,
-      name: product.value.storeName,
-      items: [],
-    };
-    cartStore.stores.push(store);
-  }
+async function handleAddToCart() {
+  if (isAdding.value || !product.value) return;
+  isAdding.value = true;
+  addError.value = '';
 
-  const existing = store.items.find((i) => i.id === product.value.id);
-  if (existing) {
-    existing.quantity += quantity.value;
-    existing.selected = true;
-  } else {
-    store.items.push({
-      id: product.value.id,
-      name: product.value.name,
-      price: product.value.price,
-      quantity: quantity.value,
-      selected: true,
-      image: product.value.image,
-      notes: notes.value,
-    });
+  try {
+    await cartStore.addItem(product.value.store_id, product.value.id, quantity.value);
+    router.push('/cart');
+  } catch (e) {
+    addError.value = getApiErrorMessage(e, 'Gagal menambahkan ke keranjang.');
+    isAdding.value = false;
   }
-
-  router.push('/cart');
 }
+
+onMounted(fetchProduct);
 </script>
 
 <template>
@@ -92,74 +84,98 @@ function handleAddToCart() {
     <MobileHeader />
 
     <main class="main-content">
-      <!-- Product Hero Image -->
-      <div class="product-hero">
-        <button
-          type="button"
-          class="back-btn"
-          @click="handleBack"
-          aria-label="Kembali"
-        >
+      <div v-if="loading" class="loading-state">
+        <button type="button" class="back-btn back-btn-inline" @click="handleBack" aria-label="Kembali">
           <Icon icon="bx:arrow-back" width="22" height="22" />
         </button>
-        <img :src="product.image" :alt="product.name" class="hero-image" />
+        <p>Memuat produk…</p>
       </div>
 
-      <!-- Title & Price -->
-      <section class="title-price-section">
-        <h1 class="product-title">{{ product.name }}</h1>
-        <p class="product-price">{{ formatRupiah(product.price) }}</p>
-      </section>
-
-      <!-- Description -->
-      <section class="desc-section">
-        <h2 class="desc-heading">Description:</h2>
-        <p class="desc-text">{{ product.description }}</p>
-      </section>
-
-      <!-- Divider -->
-      <div class="page-divider" />
-
-      <!-- Form Controls: Quantity & Notes -->
-      <section class="action-form-section">
-        <div class="amount-row">
-          <span class="amount-label">Amount</span>
-          <div class="quantity-control">
-            <button
-              type="button"
-              class="qty-btn"
-              @click="decrement"
-              aria-label="Kurangi Jumlah"
-            >
-              <Icon icon="akar-icons:minus" width="12" height="12" />
-            </button>
-            <span class="qty-num">{{ quantity }}</span>
-            <button
-              type="button"
-              class="qty-btn"
-              @click="increment"
-              aria-label="Tambah Jumlah"
-            >
-              <Icon icon="akar-icons:plus" width="12" height="12" />
-            </button>
-          </div>
-        </div>
-
-        <div class="notes-block">
-          <label for="product-notes" class="notes-label">Notes (Optional)</label>
-          <textarea
-            id="product-notes"
-            v-model="notes"
-            class="notes-textarea"
-            placeholder="Add your notes to seller..."
-            rows="4"
-          />
-        </div>
-
-        <button type="button" class="add-to-cart-btn" @click="handleAddToCart">
-          Add to Cart
+      <div v-else-if="error" class="error-state">
+        <button type="button" class="back-btn back-btn-inline" @click="handleBack" aria-label="Kembali">
+          <Icon icon="bx:arrow-back" width="22" height="22" />
         </button>
-      </section>
+        <p class="error-text">{{ error }}</p>
+      </div>
+
+      <template v-else-if="product">
+        <!-- Product Hero Image -->
+        <div class="product-hero">
+          <button
+            type="button"
+            class="back-btn"
+            @click="handleBack"
+            aria-label="Kembali"
+          >
+            <Icon icon="bx:arrow-back" width="22" height="22" />
+          </button>
+          <img :src="product.image" :alt="product.name" class="hero-image" />
+        </div>
+
+        <!-- Title & Price -->
+        <section class="title-price-section">
+          <h1 class="product-title">{{ product.name }}</h1>
+          <p class="product-price">{{ formatRupiah(product.price) }}</p>
+          <p v-if="product.store_name" class="product-store">{{ product.store_name }}</p>
+        </section>
+
+        <!-- Description -->
+        <section class="desc-section">
+          <h2 class="desc-heading">Description:</h2>
+          <p class="desc-text">{{ product.description }}</p>
+        </section>
+
+        <!-- Divider -->
+        <div class="page-divider" />
+
+        <!-- Form Controls: Quantity & Notes -->
+        <section class="action-form-section">
+          <div class="amount-row">
+            <span class="amount-label">Amount</span>
+            <div class="quantity-control">
+              <button
+                type="button"
+                class="qty-btn"
+                @click="decrement"
+                aria-label="Kurangi Jumlah"
+              >
+                <Icon icon="akar-icons:minus" width="12" height="12" />
+              </button>
+              <span class="qty-num">{{ quantity }}</span>
+              <button
+                type="button"
+                class="qty-btn"
+                @click="increment"
+                aria-label="Tambah Jumlah"
+              >
+                <Icon icon="akar-icons:plus" width="12" height="12" />
+              </button>
+            </div>
+          </div>
+
+          <div class="notes-block">
+            <label for="product-notes" class="notes-label">Notes (Optional)</label>
+            <textarea
+              id="product-notes"
+              v-model="notes"
+              class="notes-textarea"
+              placeholder="Add your notes to seller..."
+              rows="4"
+            />
+          </div>
+
+          <p v-if="addError" class="error-text" role="alert">{{ addError }}</p>
+
+          <button
+            type="button"
+            class="add-to-cart-btn"
+            :disabled="isAdding"
+            @click="handleAddToCart"
+          >
+            {{ isAdding ? 'Menambahkan…' : 'Add to Cart' }}
+          </button>
+        </section>
+      </template>
     </main>
 
     <BottomNav />
@@ -172,6 +188,31 @@ function handleAddToCart() {
   flex-direction: column;
   min-height: 100vh;
   padding-bottom: 85px;
+}
+
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: var(--space-3) var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.back-btn-inline {
+  align-self: flex-start;
+}
+
+.error-text {
+  color: #b42318;
+  font-size: var(--font-size-sm);
+}
+
+.product-store {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
 }
 
 .main-content {
@@ -362,7 +403,12 @@ function handleAddToCart() {
   transition: opacity var(--transition-fast);
 }
 
-.add-to-cart-btn:active {
+.add-to-cart-btn:active:not(:disabled) {
   opacity: 0.85;
+}
+
+.add-to-cart-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
 }
 </style>

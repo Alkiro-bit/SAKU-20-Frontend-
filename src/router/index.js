@@ -5,22 +5,48 @@ import TefaView from '@/views/public/TefaView.vue';
 import CartView from '@/views/public/CartView.vue';
 import OrdersView from '@/views/public/OrdersView.vue';
 import ProductDetailView from '@/views/public/ProductDetailView.vue';
+import CheckoutView from '@/views/public/CheckoutView.vue';
+import OrderTrackingView from '@/views/public/OrderTrackingView.vue';
 import LoginView from '@/views/auth/LoginView.vue';
 import RegisterView from '@/views/auth/RegisterView.vue';
+import AdminDashboardView from '@/views/admin/AdminDashboardView.vue';
+import SuperadminDashboardView from '@/views/superadmin/SuperadminDashboardView.vue';
 
 const routes = [
   { path: '/', name: 'home', component: HomeView },
   { path: '/stores', name: 'stores', component: ShopView },
   { path: '/tefa', name: 'tefa', component: TefaView },
-  { path: '/products/:id', name: 'product-detail', component: ProductDetailView },
-  { path: '/cart', name: 'cart', component: CartView },
+  {
+    path: '/products/:id',
+    name: 'product-detail',
+    component: ProductDetailView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/cart',
+    name: 'cart',
+    component: CartView,
+    meta: { requiresAuth: true },
+  },
   {
     path: '/orders',
     name: 'orders',
     component: OrdersView,
     meta: { requiresAuth: true },
   },
+  {
+    path: '/orders/:id',
+    name: 'order-tracking',
+    component: OrderTrackingView,
+    meta: { requiresAuth: true },
+  },
   { path: '/history', redirect: '/orders' },
+  {
+    path: '/checkout',
+    name: 'checkout',
+    component: CheckoutView,
+    meta: { requiresAuth: true },
+  },
   {
     path: '/login',
     name: 'login',
@@ -34,7 +60,26 @@ const routes = [
     meta: { guestOnly: true },
   },
   {
-    // Route admin dipasang di Fase 3 saat view-nya sudah ada.
+    path: '/admin',
+    redirect: '/admin/dashboard',
+  },
+  {
+    path: '/admin/dashboard',
+    name: 'admin-dashboard',
+    component: AdminDashboardView,
+    meta: { requiresAuth: true, role: 'admin' },
+  },
+  {
+    path: '/superadmin',
+    redirect: '/superadmin/dashboard',
+  },
+  {
+    path: '/superadmin/dashboard',
+    name: 'superadmin-dashboard',
+    component: SuperadminDashboardView,
+    meta: { requiresAuth: true, role: 'superadmin' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     redirect: '/',

@@ -1,60 +1,82 @@
 import { defineStore } from 'pinia';
-import { createCartSeed } from '@/data/products';
+import { apiClient } from '@/services/api';
 
 export const useCartStore = defineStore('cart', {
   state: () => ({
-    stores: createCartSeed(),
+    cartId: null,
+    storeId: null,
+    storeName: '',
+    items: [],
+    loading: false,
   }),
   getters: {
     totalPrice(state) {
-      let total = 0;
-      state.stores.forEach((store) => {
-        store.items.forEach((item) => {
-          if (item.selected) {
-            total += item.price * item.quantity;
-          }
-        });
-      });
-      return total;
+      return state.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     },
-    hasSelected(state) {
-      return state.stores.some((s) => s.items.some((i) => i.selected));
+    itemCount(state) {
+      return state.items.reduce((sum, item) => sum + item.quantity, 0);
+    },
+    isEmpty(state) {
+      return state.items.length === 0;
     },
   },
   actions: {
-    toggleItem(storeId, itemId) {
-      const store = this.stores.find((s) => s.id === storeId);
-      if (store) {
-        const item = store.items.find((i) => i.id === itemId);
-        if (item) item.selected = !item.selected;
-      }
-    },
-    toggleStore(storeId) {
-      const store = this.stores.find((s) => s.id === storeId);
-      if (store) {
-        const allSelected = store.items.every((i) => i.selected);
-        store.items.forEach((i) => (i.selected = !allSelected));
-      }
-    },
-    isStoreAllSelected(storeId) {
-      const store = this.stores.find((s) => s.id === storeId);
-      return store ? store.items.every((i) => i.selected) : false;
-    },
-    increment(storeId, itemId) {
-      const store = this.stores.find((s) => s.id === storeId);
-      if (store) {
-        const item = store.items.find((i) => i.id === itemId);
-        if (item) item.quantity++;
-      }
-    },
-    decrement(storeId, itemId) {
-      const store = this.stores.find((s) => s.id === storeId);
-      if (store) {
-        const item = store.items.find((i) => i.id === itemId);
-        if (item && item.quantity > 1) {
-          item.quantity--;
+    async fetchCart(storeId) {
+      this.loading = true;
+      try {
+        const res = await apiClient.get('/cart', { params: { store_id: storeId } });
+        const cart = res.data.data;
+        this.cartId = cart.id;
+        this.storeId = storeId;
+        this.storeName = cart.store_name || '';
+        this.items = cart.items || [];
+      } catch (e) {
+        if (e.response?.status === 404) {
+          this.cartId = null;
+          this.items = [];
+        } else {
+          throw e;
         }
+      } finally {
+        this.loading = false;
       }
+    },
+    async addItem(storeId, productId, quantity = 1) {
+      const res = await apiClient.post('/cart/items', {
+        store_id: storeId,
+        product_id: productId,
+        quantity,
+      });
+      // Refetch to sync state
+      await this.fetchCart(storeId);
+      return res.data;
+    },
+    async updateQuantity(itemId, quantity) {
+      await apiClient.patch(`/cart/items/${itemId}`, { quantity });
+      if (this.storeId) await this.fetchCart(this.storeId);
+    },
+    async removeItem(itemId) {
+      await apiClient.delete(`/cart/items/${itemId}`);
+      if (this.storeId) await this.fetchCart(this.storeId);
+    },
+    async clearCart() {
+      if (!this.cartId) return;
+      await apiClient.delete(`/cart/${this.cartId}`);
+      this.cartId = null;
+      this.items = [];
+    },
+    async checkout() {
+      if (!this.cartId) throw new Error('Keranjang kosong');
+      const res = await apiClient.post('/orders', { cart_id: this.cartId });
+      this.cartId = null;
+      this.items = [];
+      return res.data.data;
+    },
+    resetCart() {
+      this.cartId = null;
+      this.storeId = null;
+      this.storeName = '';
+      this.items = [];
     },
   },
 });

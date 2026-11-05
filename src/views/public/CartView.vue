@@ -1,13 +1,16 @@
 <script setup>
-import { computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Icon } from '@iconify/vue';
 import { useCartStore } from '@/stores/cart';
+import { getApiErrorMessage } from '@/services/api';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 
 const router = useRouter();
 const cartStore = useCartStore();
+const error = ref('');
+const updatingItem = ref(null);
 
 function formatRupiah(value) {
   if (!value && value !== 0) return 'Rp 0';
@@ -18,11 +21,42 @@ function formatRupiah(value) {
   }).format(value);
 }
 
-function handleCheckout() {
-  if (!cartStore.hasSelected) {
-    alert('Pilih minimal 1 item untuk checkout');
-    return;
+async function handleIncrement(item) {
+  updatingItem.value = item.id;
+  try {
+    await cartStore.updateQuantity(item.id, item.quantity + 1);
+  } catch (e) {
+    error.value = getApiErrorMessage(e);
+  } finally {
+    updatingItem.value = null;
   }
+}
+
+async function handleDecrement(item) {
+  if (item.quantity <= 1) return;
+  updatingItem.value = item.id;
+  try {
+    await cartStore.updateQuantity(item.id, item.quantity - 1);
+  } catch (e) {
+    error.value = getApiErrorMessage(e);
+  } finally {
+    updatingItem.value = null;
+  }
+}
+
+async function handleRemove(item) {
+  updatingItem.value = item.id;
+  try {
+    await cartStore.removeItem(item.id);
+  } catch (e) {
+    error.value = getApiErrorMessage(e);
+  } finally {
+    updatingItem.value = null;
+  }
+}
+
+function handleCheckout() {
+  if (cartStore.isEmpty) return;
   router.push('/checkout');
 }
 </script>
@@ -36,82 +70,72 @@ function handleCheckout() {
         <h1 class="page-title">My Cart</h1>
       </div>
 
-      <div class="cart-list">
-        <div
-          v-for="store in cartStore.stores"
-          :key="'store-' + store.id"
-          class="cart-card"
-        >
-          <!-- Store Header -->
-          <div class="store-header" @click="cartStore.toggleStore(store.id)">
-            <button
-              type="button"
-              class="checkbox-custom"
-              :class="{ 'is-checked': cartStore.isStoreAllSelected(store.id) }"
-              aria-label="Pilih Semua di Toko Ini"
-            >
-              <Icon
-                v-if="cartStore.isStoreAllSelected(store.id)"
-                icon="akar-icons:check"
-                width="16"
-                height="16"
-              />
-            </button>
-            <span class="store-name">{{ store.name }}</span>
+      <p v-if="error" class="cart-error" role="alert">{{ error }}</p>
+
+      <div v-if="cartStore.loading" class="cart-empty">
+        <p>Memuat keranjang…</p>
+      </div>
+
+      <div v-else-if="cartStore.isEmpty" class="cart-empty">
+        <Icon icon="mdi:cart-off" width="48" height="48" />
+        <p>Keranjang kosong</p>
+      </div>
+
+      <div v-else class="cart-list">
+        <div class="cart-card">
+          <div class="store-header">
+            <Icon icon="mdi:store" width="20" height="20" />
+            <span class="store-name">{{ cartStore.storeName }}</span>
           </div>
 
-          <!-- Product Items -->
           <div class="product-list">
             <div
-              v-for="item in store.items"
+              v-for="item in cartStore.items"
               :key="'item-' + item.id"
               class="product-row"
             >
               <div class="product-left">
-                <button
-                  type="button"
-                  class="checkbox-custom"
-                  :class="{ 'is-checked': item.selected }"
-                  @click="cartStore.toggleItem(store.id, item.id)"
-                  aria-label="Pilih Produk"
-                >
-                  <Icon
-                    v-if="item.selected"
-                    icon="akar-icons:check"
-                    width="16"
-                    height="16"
-                  />
-                </button>
-
                 <div class="product-thumb">
                   <img :src="item.image" :alt="item.name" loading="lazy" />
                 </div>
-
                 <div class="product-meta">
                   <p class="product-name">{{ item.name }}</p>
                   <p class="product-price">{{ formatRupiah(item.price) }}</p>
                 </div>
               </div>
 
-              <!-- Quantity Controls -->
-              <div class="quantity-control">
+              <div class="product-right">
                 <button
                   type="button"
-                  class="qty-btn"
-                  @click="cartStore.decrement(store.id, item.id)"
-                  aria-label="Kurangi Jumlah"
+                  class="remove-btn"
+                  :disabled="updatingItem === item.id"
+                  @click="handleRemove(item)"
+                  aria-label="Hapus Item"
                 >
-                  <Icon icon="akar-icons:minus" width="14" height="14" />
+                  <Icon icon="mdi:trash-can-outline" width="18" height="18" />
                 </button>
-                <span class="qty-num">{{ item.quantity }}</span>
-                <button
-                  type="button"
-                  class="qty-btn"
-                  @click="cartStore.increment(store.id, item.id)"
-                  aria-label="Tambah Jumlah"
-                >
-                  <Icon icon="akar-icons:plus" width="14" height="14" />
-                </button>
+
+                <div class="quantity-control">
+                  <button
+                    type="button"
+                    class="qty-btn"
+                    :disabled="item.quantity <= 1 || updatingItem === item.id"
+                    @click="handleDecrement(item)"
+                    aria-label="Kurangi Jumlah"
+                  >
+                    <Icon icon="akar-icons:minus" width="14" height="14" />
+                  </button>
+                  <span class="qty-num">{{ item.quantity }}</span>
+                  <button
+                    type="button"
+                    class="qty-btn"
+                    :disabled="updatingItem === item.id"
+                    @click="handleIncrement(item)"
+                    aria-label="Tambah Jumlah"
+                  >
+                    <Icon icon="akar-icons:plus" width="14" height="14" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -119,8 +143,7 @@ function handleCheckout() {
       </div>
     </main>
 
-    <!-- Sticky Bottom Checkout Bar -->
-    <div class="checkout-bar">
+    <div v-if="!cartStore.isEmpty" class="checkout-bar">
       <div class="total-info">
         <span class="total-label">Total:</span>
         <span class="total-value">{{ formatRupiah(cartStore.totalPrice) }}</span>
@@ -128,7 +151,7 @@ function handleCheckout() {
       <button
         type="button"
         class="checkout-btn"
-        :disabled="!cartStore.hasSelected"
+        :disabled="cartStore.isEmpty"
         @click="handleCheckout"
       >
         Checkout
@@ -144,7 +167,7 @@ function handleCheckout() {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  padding-bottom: 155px; /* Spacing agar checkout bar & bottom nav tidak menutupi item */
+  padding-bottom: 155px;
 }
 
 .main-content {
@@ -166,6 +189,23 @@ function handleCheckout() {
   color: var(--color-text);
 }
 
+.cart-error {
+  color: #b42318;
+  font-size: var(--font-size-sm);
+  text-align: center;
+  padding: 8px;
+}
+
+.cart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: var(--space-3) 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-base);
+}
+
 .cart-list {
   display: flex;
   flex-direction: column;
@@ -185,7 +225,6 @@ function handleCheckout() {
   gap: 8px;
   padding: 12px 14px;
   border-bottom: 0.5px solid #d1d5db;
-  cursor: pointer;
   background-color: #fafbfc;
 }
 
@@ -194,25 +233,6 @@ function handleCheckout() {
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-base);
   color: var(--color-text);
-}
-
-.checkbox-custom {
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  border: 1px solid var(--color-border);
-  background-color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  flex-shrink: 0;
-  transition: all var(--transition-fast);
-}
-
-.checkbox-custom.is-checked {
-  background-color: var(--color-primary);
-  border-color: var(--color-primary);
 }
 
 .product-list {
@@ -280,6 +300,28 @@ function handleCheckout() {
   color: var(--color-text);
 }
 
+.product-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: #b42318;
+  border-radius: 4px;
+}
+
+.remove-btn:hover {
+  background-color: rgba(180, 35, 24, 0.08);
+}
+
 .quantity-control {
   display: flex;
   align-items: center;
@@ -302,6 +344,10 @@ function handleCheckout() {
   color: var(--color-text);
 }
 
+.qty-btn:disabled {
+  opacity: 0.3;
+}
+
 .qty-num {
   font-family: var(--font-family-base);
   font-weight: var(--font-weight-medium);
@@ -309,10 +355,9 @@ function handleCheckout() {
   color: var(--color-text);
 }
 
-/* Sticky Checkout Bar */
 .checkout-bar {
   position: fixed;
-  bottom: 70px; /* Tepat di atas bottom nav */
+  bottom: 70px;
   left: 50%;
   transform: translateX(-50%);
   width: 100%;

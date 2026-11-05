@@ -40,26 +40,3 @@ export const categories = [
   'Bahan Masakan',
   'Kesehatan & Kebersihan',
 ];
-
-export const createCartSeed = () => [
-  {
-    id: 1,
-    name: 'JungleFood',
-    items: [{ ...p.indomie, quantity: 1, selected: false }],
-  },
-  {
-    id: 2,
-    name: 'MeetUp Cafe',
-    items: [
-      { ...p.doritos, quantity: 1, selected: false },
-      { ...p.golda, quantity: 2, selected: true },
-    ],
-  },
-];
-
-export const orders = [
-  { id: 1, storeName: 'JungleFood', status: 'pending', pickupNumber: '168', item: { ...p.indomie, quantity: 1 } },
-  { id: 2, storeName: 'TEFA', status: 'ready', pickupNumber: '88', item: { ...p.golda, quantity: 2 } },
-  { id: 3, storeName: 'Meetup Cafe', status: 'completed', pickupNumber: '9', item: { ...p.goodDay, quantity: 2 } },
-  { id: 4, storeName: 'Bisnis Digital', status: 'canceled', pickupNumber: '67', item: { ...p.makaroni, quantity: 1 } },
-];
