@@ -1,4 +1,6 @@
 <script setup>
+import { resolveImageUrl } from '@/services/api';
+
 defineProps({
   product: {
     type: Object,
@@ -28,7 +30,7 @@ function formatRupiah(value) {
   >
     <div class="product-photo">
       <img
-        :src="product.image || 'https://placehold.co/300x300?text=Produk'"
+        :src="resolveImageUrl(product.image_url || product.image)"
         :alt="product.name"
         loading="lazy"
       />

@@ -1,10 +1,25 @@
 import { defineStore } from 'pinia';
-import { apiClient } from '@/services/api';
+import { apiClient, resolveImageUrl } from '@/services/api';
+
+const CART_STORE_ID_KEY = 'cart_store_id';
+
+function normalizeCartItem(raw) {
+  const product = raw.product || {};
+  return {
+    id: raw.id,
+    productId: raw.product_id || product.id,
+    name: product.name || raw.name || 'Produk',
+    price: Number(product.price ?? raw.price ?? 0),
+    quantity: Number(raw.quantity || 1),
+    image: resolveImageUrl(product.image_url || raw.image || raw.image_url),
+    rawProduct: product,
+  };
+}
 
 export const useCartStore = defineStore('cart', {
   state: () => ({
     cartId: null,
-    storeId: null,
+    storeId: Number(localStorage.getItem(CART_STORE_ID_KEY)) || null,
     storeName: '',
     items: [],
     loading: false,
@@ -21,15 +36,20 @@ export const useCartStore = defineStore('cart', {
     },
   },
   actions: {
-    async fetchCart(storeId) {
+    async fetchCart(targetStoreId = this.storeId) {
+      if (!targetStoreId) {
+        this.items = [];
+        return;
+      }
       this.loading = true;
       try {
-        const res = await apiClient.get('/cart', { params: { store_id: storeId } });
+        const res = await apiClient.get('/cart', { params: { store_id: targetStoreId } });
         const cart = res.data.data;
-        this.cartId = cart.id;
-        this.storeId = storeId;
-        this.storeName = cart.store_name || '';
-        this.items = cart.items || [];
+        this.cartId = cart?.id || null;
+        this.storeId = targetStoreId;
+        this.storeName = cart?.store_name || cart?.store?.name || '';
+        this.items = (cart?.items || []).map(normalizeCartItem);
+        localStorage.setItem(CART_STORE_ID_KEY, String(targetStoreId));
       } catch (e) {
         if (e.response?.status === 404) {
           this.cartId = null;
@@ -47,7 +67,6 @@ export const useCartStore = defineStore('cart', {
         product_id: productId,
         quantity,
       });
-      // Refetch to sync state
       await this.fetchCart(storeId);
       return res.data;
     },
@@ -62,14 +81,12 @@ export const useCartStore = defineStore('cart', {
     async clearCart() {
       if (!this.cartId) return;
       await apiClient.delete(`/cart/${this.cartId}`);
-      this.cartId = null;
-      this.items = [];
+      this.resetCart();
     },
     async checkout() {
       if (!this.cartId) throw new Error('Keranjang kosong');
       const res = await apiClient.post('/orders', { cart_id: this.cartId });
-      this.cartId = null;
-      this.items = [];
+      this.resetCart();
       return res.data.data;
     },
     resetCart() {
@@ -77,6 +94,7 @@ export const useCartStore = defineStore('cart', {
       this.storeId = null;
       this.storeName = '';
       this.items = [];
+      localStorage.removeItem(CART_STORE_ID_KEY);
     },
   },
 });

@@ -45,3 +45,12 @@ export function getApiValidationErrors(error) {
   const errors = error?.response?.data?.errors;
   return errors && typeof errors === 'object' ? errors : {};
 }
+
+const STORAGE_BASE_URL = import.meta.env.VITE_STORAGE_BASE_URL || 'http://localhost:8000/storage';
+
+export function resolveImageUrl(pathOrUrl, fallback = 'https://placehold.co/300x300?text=Produk') {
+  if (!pathOrUrl) return fallback;
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  const cleanPath = pathOrUrl.startsWith('/') ? pathOrUrl.slice(1) : pathOrUrl;
+  return `${STORAGE_BASE_URL}/${cleanPath}`;
+}

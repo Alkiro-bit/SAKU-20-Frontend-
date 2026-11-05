@@ -59,6 +59,16 @@ function handleCheckout() {
   if (cartStore.isEmpty) return;
   router.push('/checkout');
 }
+
+onMounted(async () => {
+  if (cartStore.storeId) {
+    try {
+      await cartStore.fetchCart();
+    } catch (e) {
+      error.value = getApiErrorMessage(e, 'Gagal memuat keranjang.');
+    }
+  }
+});
 </script>
 
 <template>

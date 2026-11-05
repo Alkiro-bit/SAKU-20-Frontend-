@@ -5,7 +5,7 @@ import { Icon } from '@iconify/vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import { useCartStore } from '@/stores/cart';
-import { apiClient, getApiErrorMessage } from '@/services/api';
+import { apiClient, getApiErrorMessage, resolveImageUrl } from '@/services/api';
 import { getLastMainPath } from '@/router';
 
 function handleBack() {
@@ -35,7 +35,8 @@ async function fetchProduct() {
   error.value = '';
   try {
     const res = await apiClient.get(`/products/${productId.value}`);
-    product.value = res.data.data;
+    const data = res.data.data;
+    product.value = data ? { ...data, image: resolveImageUrl(data.image_url || data.image) } : null;
   } catch (e) {
     error.value = getApiErrorMessage(e, 'Gagal memuat detail produk.');
   } finally {
