@@ -22,17 +22,6 @@ const cartStore = useCartStore();
 
 const productId = computed(() => Number(route.params.id) || 1);
 
-const defaultDescriptions = {
-  1: 'Es teh manis segar diseduh dari daun teh pilihan dengan manis yang pas.',
-  2: 'Indomie goreng legendaris disajikan hangat dengan taburan bawang goreng.',
-  3: 'Cireng yang digoreng dengan penuh kenikmatan dan penuh dengan cinta yang menghasilkan harmoni rasa yang sempurna dalam setiap gigitannya.',
-  4: 'Kopi hitam mantap khas Kapal Api, aroma kuat dan rasa nikmat.',
-  5: 'Keripik jagung renyah dengan bumbu gurih yang khas dan bikin nagih.',
-  6: 'Kopi susu instan dalam kemasan botol siap minum dengan rasa mantap.',
-  7: 'Kopi instan dengan aroma kopi nikmat dan rasa manis yang pas di lidah.',
-  8: 'Makaroni pedas gurih dengan tekstur renyah yang pas untuk camilan santai.',
-};
-
 const storeMap = Object.fromEntries(stores.map((s) => [s.id, s.name]));
 
 const product = computed(() => {
@@ -41,7 +30,7 @@ const product = computed(() => {
   return {
     ...base,
     storeName: storeMap[base.storeId] || 'Toko SAKU',
-    description: defaultDescriptions[base.id] || 'Produk segar berkualitas dari kantin sekolah.',
+    description: base.description || 'Produk segar berkualitas dari kantin sekolah.',
   };
 });
 

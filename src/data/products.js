@@ -2,14 +2,14 @@ const img = (id) => `https://images.unsplash.com/${id}?w=300`;
 
 // ponytail: single source of truth untuk data dummy. Ganti ke apiClient saat backend siap.
 const p = {
-  esTeh: { id: 1, storeId: 1, name: 'Es Teh Manis', price: 5000, category: 'Minuman', image: img('photo-1556679343-c7306c1976bc') },
-  indomie: { id: 2, storeId: 1, name: 'Indomie Goreng', price: 7000, category: 'Makanan', image: img('photo-1612927601601-6638404737ce') },
-  cireng: { id: 3, storeId: 2, name: 'Cireng', price: 6000, category: 'Makanan', image: img('photo-1541592106381-b31e9677c0e5') },
-  kapalApi: { id: 4, storeId: 2, name: 'Kapal Api', price: 7000, category: 'Minuman', image: img('photo-1514432324607-a09d9b4aefdd') },
-  doritos: { id: 5, storeId: 2, name: 'Doritos', price: 7000, category: 'Makanan', image: img('photo-1566478989037-eec170784d0b') },
-  golda: { id: 6, storeId: 2, name: 'Golda', price: 4000, category: 'Minuman', image: img('photo-1514432324607-a09d9b4aefdd') },
-  goodDay: { id: 7, storeId: 3, name: 'GoodDay', price: 8000, category: 'Minuman', image: img('photo-1541592106381-b31e9677c0e5') },
-  makaroni: { id: 8, storeId: 4, name: 'Makaroni Kongz', price: 6000, category: 'Makanan', image: img('photo-1566478989037-eec170784d0b') },
+  esTeh: { id: 1, storeId: 1, name: 'Es Teh Manis', price: 5000, category: 'Minuman', description: 'Es teh manis segar diseduh dari daun teh pilihan dengan manis yang pas.', image: img('photo-1556679343-c7306c1976bc') },
+  indomie: { id: 2, storeId: 1, name: 'Indomie Goreng', price: 7000, category: 'Makanan', description: 'Indomie goreng legendaris disajikan hangat dengan taburan bawang goreng.', image: img('photo-1612927601601-6638404737ce') },
+  cireng: { id: 3, storeId: 2, name: 'Cireng', price: 6000, category: 'Makanan', description: 'Cireng yang digoreng dengan penuh kenikmatan dan penuh dengan cinta yang menghasilkan harmoni rasa yang sempurna dalam setiap gigitannya.', image: img('photo-1541592106381-b31e9677c0e5') },
+  kapalApi: { id: 4, storeId: 2, name: 'Kapal Api', price: 7000, category: 'Minuman', description: 'Kopi hitam mantap khas Kapal Api, aroma kuat dan rasa nikmat.', image: img('photo-1514432324607-a09d9b4aefdd') },
+  doritos: { id: 5, storeId: 2, name: 'Doritos', price: 7000, category: 'Makanan', description: 'Keripik jagung renyah dengan bumbu gurih yang khas dan bikin nagih.', image: img('photo-1566478989037-eec170784d0b') },
+  golda: { id: 6, storeId: 2, name: 'Golda', price: 4000, category: 'Minuman', description: 'Kopi susu instan dalam kemasan botol siap minum dengan rasa mantap.', image: img('photo-1514432324607-a09d9b4aefdd') },
+  goodDay: { id: 7, storeId: 3, name: 'GoodDay', price: 8000, category: 'Minuman', description: 'Kopi instan dengan aroma kopi nikmat dan rasa manis yang pas di lidah.', image: img('photo-1541592106381-b31e9677c0e5') },
+  makaroni: { id: 8, storeId: 4, name: 'Makaroni Kongz', price: 6000, category: 'Makanan', description: 'Makaroni pedas gurih dengan tekstur renyah yang pas untuk camilan santai.', image: img('photo-1566478989037-eec170784d0b') },
 };
 
 export const products = p;
