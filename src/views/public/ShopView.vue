@@ -1,11 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { Icon } from '@iconify/vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import StoreCard from '@/components/modules/StoreCard.vue';
 import ProductCard from '@/components/modules/ProductCard.vue';
-import { getStores, getStoreProducts, getApiErrorMessage } from '@/services/api';
+import { getStores, getStoreProductsPage, getApiErrorMessage } from '@/services/api';
 
 const searchQuery = ref('');
 const selectedStoreId = ref(null);
@@ -14,6 +14,10 @@ const error = ref('');
 
 const storesList = ref([]);
 const rawProducts = ref([]);
+const loadingMore = ref(false);
+const hasMore = ref(false);
+const loadMoreTarget = ref(null);
+let observer;
 
 const storeFilters = computed(() => [{ id: null, name: 'All' }, ...storesList.value]);
 const allProducts = computed(() => rawProducts.value);
@@ -29,28 +33,49 @@ const filteredProducts = computed(() => {
   });
 });
 
-async function loadProducts(storeId = null) {
-  loading.value = true;
+let requestId = 0;
+let nextPage = 1;
+
+async function loadProducts(storeId = null, append = false) {
+  if (loadingMore.value) return;
+  const currentRequest = ++requestId;
+  loading.value = !append;
+  loadingMore.value = append;
   error.value = '';
   try {
-    if (storeId) {
-      const items = await getStoreProducts(storeId);
-      rawProducts.value = items;
-    } else {
-      const results = await Promise.allSettled(storesList.value.map((s) => getStoreProducts(s.id)));
-      const combined = [];
-      results.forEach((res) => {
-        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
-          combined.push(...res.value);
-        }
-      });
-      rawProducts.value = combined;
-    }
+    const stores = storeId ? [{ id: storeId }] : storesList.value;
+    const results = await Promise.allSettled(
+      stores.map((store) => getStoreProductsPage(store.id, { page: append ? nextPage : 1 })),
+    );
+    if (currentRequest !== requestId) return;
+    const combined = results.flatMap((res) => (res.status === 'fulfilled' ? res.value.items : []));
+    rawProducts.value = append ? [...rawProducts.value, ...combined] : combined;
+    const pages = results
+      .filter((res) => res.status === 'fulfilled')
+      .map((res) => res.value.meta?.last_page ?? 1);
+    hasMore.value = pages.length > 0 && nextPage < Math.max(...pages);
+    nextPage += 1;
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memuat produk dari server.');
+    if (currentRequest === requestId) error.value = getApiErrorMessage(e, 'Gagal memuat produk dari server.');
   } finally {
-    loading.value = false;
+    if (currentRequest === requestId) {
+      loading.value = false;
+      loadingMore.value = false;
+    }
   }
+}
+
+function resetAndLoad(storeId = null) {
+  requestId += 1;
+  nextPage = 1;
+  hasMore.value = false;
+  loadingMore.value = false;
+  rawProducts.value = [];
+  loadProducts(storeId);
+}
+
+function handleLoadMore(entries) {
+  if (entries[0]?.isIntersecting && hasMore.value) loadProducts(selectedStoreId.value, true);
 }
 
 async function loadInitialData() {
@@ -60,7 +85,7 @@ async function loadInitialData() {
   } catch {
     storesList.value = [];
   }
-  await loadProducts(selectedStoreId.value);
+  resetAndLoad(selectedStoreId.value);
 }
 
 function toggleStore(store) {
@@ -68,10 +93,17 @@ function toggleStore(store) {
 }
 
 watch(selectedStoreId, (newStoreId) => {
-  loadProducts(newStoreId);
+  resetAndLoad(newStoreId);
 });
 
 onMounted(loadInitialData);
+
+onMounted(() => {
+  observer = new IntersectionObserver(handleLoadMore, { rootMargin: '320px' });
+  if (loadMoreTarget.value) observer.observe(loadMoreTarget.value);
+});
+
+onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <template>
@@ -135,6 +167,9 @@ onMounted(loadInitialData);
             :product="item"
           />
         </div>
+        <p v-if="loadingMore" class="load-status" aria-live="polite">Memuat produk...</p>
+        <p v-else-if="error" class="load-status error" role="alert">{{ error }}</p>
+        <div ref="loadMoreTarget" class="load-more-target" aria-hidden="true" />
       </section>
 
     </main>
@@ -236,5 +271,20 @@ onMounted(loadInitialData);
 
 .carousel-track::-webkit-scrollbar {
   display: none;
+}
+
+.load-status {
+  padding: 8px var(--space-2);
+  color: var(--color-text-muted);
+  text-align: center;
+  font-size: var(--font-size-sm);
+}
+
+.load-status.error {
+  color: var(--color-primary);
+}
+
+.load-more-target {
+  height: 1px;
 }
 </style>

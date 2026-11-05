@@ -125,9 +125,11 @@ onMounted(fetchProduct);
         <!-- Title & Price -->
         <section class="title-price-section">
           <h1 class="product-title">{{ product.name }}</h1>
-          <p class="product-price">{{ formatRupiah(product.price) }}</p>
+          <div class="price-stock-row">
+            <p class="product-price">{{ formatRupiah(product.price) }}</p>
+            <p v-if="product.stock !== undefined" class="product-stock">Stok: {{ product.stock }}</p>
+          </div>
           <p v-if="storeName" class="product-store">{{ storeName }}</p>
-          <p v-if="product.stock !== undefined" class="product-stock">Stok: {{ product.stock }}</p>
         </section>
 
         <!-- Description -->
@@ -289,6 +291,12 @@ onMounted(fetchProduct);
   font-size: 32px;
   line-height: 1.15;
   color: var(--color-text);
+}
+
+.price-stock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .product-price {

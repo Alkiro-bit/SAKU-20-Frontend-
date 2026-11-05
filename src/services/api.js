@@ -65,9 +65,17 @@ export async function getStore(storeId) {
   return res.data?.data || null;
 }
 
-export async function getStoreProducts(storeId, params = {}) {
+export async function getStoreProductsPage(storeId, params = {}) {
   const res = await apiClient.get(`/stores/${storeId}/products`, { params });
-  return res.data?.data || [];
+  return {
+    items: res.data?.data || [],
+    meta: res.data?.meta || null,
+  };
+}
+
+export async function getStoreProducts(storeId, params = {}) {
+  const { items } = await getStoreProductsPage(storeId, params);
+  return items;
 }
 
 export async function getProduct(productId) {

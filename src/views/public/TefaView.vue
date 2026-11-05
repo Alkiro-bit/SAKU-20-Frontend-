@@ -1,14 +1,20 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { Icon } from '@iconify/vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import ProductCard from '@/components/modules/ProductCard.vue';
-import { getStores, getStoreProducts } from '@/services/api';
+import { getStores, getStoreProductsPage } from '@/services/api';
 
 const searchQuery = ref('');
 const selectedCategory = ref('All');
 const apiProducts = ref([]);
+const loadingMore = ref(false);
+const hasMore = ref(false);
+const loadMoreTarget = ref(null);
+let tefaStoreId = null;
+let nextPage = 1;
+let observer;
 
 const categories = computed(() => {
   const dynamic = new Set();
@@ -34,18 +40,39 @@ const filteredProducts = computed(() => {
   });
 });
 
+async function loadProducts(append = false) {
+  if (!tefaStoreId || loadingMore.value) return;
+  loadingMore.value = true;
+  try {
+    const { items, meta } = await getStoreProductsPage(tefaStoreId, { page: nextPage });
+    apiProducts.value = append ? [...apiProducts.value, ...items] : items;
+    nextPage += 1;
+    hasMore.value = nextPage <= (meta?.last_page ?? 1);
+  } catch {
+    hasMore.value = false;
+  } finally {
+    loadingMore.value = false;
+  }
+}
+
+function handleLoadMore(entries) {
+  if (entries[0]?.isIntersecting && hasMore.value) loadProducts(true);
+}
+
 onMounted(async () => {
   try {
     const tefaStores = await getStores({ type: 'tefa' });
     const tefaStore = tefaStores.find((s) => s.store_type === 'tefa') || tefaStores[0];
-    if (tefaStore) {
-      const items = await getStoreProducts(tefaStore.id);
-      apiProducts.value = items || [];
-    }
+    tefaStoreId = tefaStore?.id || null;
+    await loadProducts();
   } catch {
     apiProducts.value = [];
   }
+  observer = new IntersectionObserver(handleLoadMore, { rootMargin: '320px' });
+  if (loadMoreTarget.value) observer.observe(loadMoreTarget.value);
 });
+
+onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <template>
@@ -104,6 +131,8 @@ onMounted(async () => {
             :product="item"
           />
         </div>
+        <p v-if="loadingMore" class="load-status" aria-live="polite">Memuat produk...</p>
+        <div ref="loadMoreTarget" class="load-more-target" aria-hidden="true" />
       </section>
 
 
@@ -229,5 +258,16 @@ onMounted(async () => {
 
 .carousel-track::-webkit-scrollbar {
   display: none;
+}
+
+.load-status {
+  padding: 8px var(--space-2);
+  color: var(--color-text-muted);
+  text-align: center;
+  font-size: var(--font-size-sm);
+}
+
+.load-more-target {
+  height: 1px;
 }
 </style>
