@@ -50,14 +50,40 @@ Restart Vite setelah mengubah `.env`:
 npm run dev
 ```
 
-## 4. Format Login
+## 4. Format Auth
 
-Request:
+### Register
+
+`POST /auth/register`
 
 ```json
 {
-  "nis_nip": "12345",
-  "password": "password-testing"
+  "email": "buyer@example.com",
+  "name": "Buyer",
+  "password": "password123",
+  "password_confirmation": "password123"
+}
+```
+
+Email dikirim setelah `trim()` dan `toLowerCase()`. Register tidak memerlukan whitelist NIS/NIP.
+
+### Login utama
+
+`POST /auth/login`
+
+```json
+{
+  "email": "buyer@example.com",
+  "password": "password123"
+}
+```
+
+Akun lama tetap mendukung:
+
+```json
+{
+  "nis_nip": "NIS001",
+  "password": "password123"
 }
 ```
 
@@ -85,25 +111,12 @@ Frontend mengirim token pada request berikutnya:
 Authorization: Bearer TOKEN
 ```
 
-## 5. Registrasi Akun
+## 5. Validasi Auth
 
-Endpoint: `POST /api/v1/auth/register`
-
-Request wajib:
-
-```json
-{
-  "nis_nip": "14190",
-  "name": "Nama Pengguna",
-  "password": "password123",
-  "password_confirmation": "password123"
-}
-```
-
-`nis_nip` harus terdaftar di database sekolah dan belum digunakan. Frontend menghapus spasi awal/akhir pada `nis_nip` dan `name`; validasi tetap dilakukan backend.
-
-- `422`: NIS/NIP tidak valid atau field wajib belum lengkap. Tampilkan `response.errors.nis_nip[0]` bila tersedia.
-- `409`: NIS/NIP sudah pernah digunakan.
+- `422`: email/name/password invalid atau field wajib belum lengkap; tampilkan `errors.email`, `errors.name`, `errors.password`.
+- `401`: kredensial email atau NIS/NIP salah.
+- `403`: akun nonaktif.
+- Register tidak menampilkan atau mengirim error NIS/NIP.
 
 ## 6. Format Produk
 

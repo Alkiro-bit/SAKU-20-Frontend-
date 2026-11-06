@@ -9,7 +9,7 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
-const nisNip = ref('');
+const email = ref('');
 const name = ref('');
 const password = ref('');
 const passwordConfirmation = ref('');
@@ -33,7 +33,7 @@ async function handleSubmit() {
 
   try {
     await authStore.register({
-      nis_nip: nisNip.value.trim(),
+      email: email.value.trim().toLowerCase(),
       name: name.value.trim(),
       password: password.value,
       password_confirmation: passwordConfirmation.value,
@@ -60,24 +60,23 @@ async function handleSubmit() {
             <Icon icon="bx:arrow-back" width="24" height="24" />
           </router-link>
         </div>
-        <p>Daftar menggunakan NIS/NIP yang terdaftar di sekolah</p>
+        <p>Daftar menggunakan email yang valid</p>
       </header>
 
       <form class="auth-form" @submit.prevent="handleSubmit">
         <div class="auth-fields">
           <div class="auth-field">
-            <label for="register-nis-nip">NIS/NIP</label>
+            <label for="register-email">Email</label>
             <input
-              id="register-nis-nip"
-              v-model.trim="nisNip"
-              name="nis_nip"
-              type="text"
-              inputmode="numeric"
-              autocomplete="username"
-              placeholder="Masukkan NIS atau NIP"
+              id="register-email"
+              v-model.trim="email"
+              name="email"
+              type="email"
+              autocomplete="email"
+              placeholder="Masukkan email"
               required
             />
-            <p v-if="fieldErrors.nis_nip" class="auth-error">{{ fieldErrors.nis_nip[0] }}</p>
+            <p v-if="fieldErrors.email" class="auth-error">{{ fieldErrors.email[0] }}</p>
           </div>
           <div class="auth-field">
             <label for="register-name">Nama Lengkap</label>

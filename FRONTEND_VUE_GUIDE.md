@@ -65,7 +65,7 @@ VITE_STORAGE_BASE_URL=http://localhost:8000/storage
 
 Aplikasi memiliki 4 jenis pengguna:
 1. **Tamu (Guest)**: Belanja tanpa akun. Identitas berupa UUID v4 yang disimpan di `localStorage` sebagai `guest_token`, dikirim via header `X-Guest-Token`.
-2. **Pembeli Login (Siswa/Guru/Staff)**: Login via NIS/NIP. Token disimpan di `localStorage`, dikirim via header `Authorization: Bearer <token>`.
+2. **Pembeli Login (Siswa/Guru/Staff)**: Login utama via email; akun lama tetap mendukung NIS/NIP. Token disimpan di `localStorage`, dikirim via header `Authorization: Bearer <token>`.
 3. **Admin (Penjual)**: Mengelola toko miliknya sendiri.
 4. **Superadmin**: Mengelola seluruh toko, user, kategori, dan whitelist NIS/NIP.
 
@@ -131,8 +131,8 @@ apiClient.interceptors.response.use(
 | `/checkout` | Publik (Guest/User) | Review pesanan, input nama (guest), tombol "Simulate Paid" |
 | `/orders/:id` | Publik (Guest/User) | Live tracking pesanan (nomor antrian & pickup code), via polling |
 | `/history` | Pembeli Login | Riwayat pesanan akun |
-| `/login` | Guest Only | Form login NIS/NIP |
-| `/register` | Guest Only | Form register siswa/guru (validasi ke whitelist NIS) |
+| `/login` | Guest Only | Form login email (fallback NIS/NIP akun lama) |
+| `/register` | Guest Only | Form register dengan email |
 | `/admin/dashboard` | Admin | Kelola buka/tutup toko, ringkasan pesanan & finansial |
 | `/admin/products` | Admin | CRUD produk toko sendiri (upload WebP) |
 | `/admin/orders` | Admin | Pesanan masuk (polling berkala) & update status |
@@ -195,10 +195,10 @@ Format respons backend konsisten:
 ```
 
 ### 5.1 Autentikasi (`/auth`)
-- `POST /auth/register` — Body: `{ nis_nip, name, password, password_confirmation }`
-- `POST /auth/login` — Body: `{ nis_nip, password }`. Respons: `{ success: true, data: { user, token } }`
+- `POST /auth/register` — Body: `{ email, name, password, password_confirmation }`
+- `POST /auth/login` — Body utama: `{ email, password }`; akun lama: `{ nis_nip, password }`. Respons: `{ success: true, data: { user, token } }`
 - `POST /auth/logout` — Header: `Authorization: Bearer <token>`
-- `GET /auth/me` — Profil user lengkap `{ id, nis_nip, name, role, is_active }`
+- `GET /auth/me` — Profil user `{ id, email, nis_nip, name, role, is_active }`
 
 ### 5.2 Publik & Katalog (`/stores`, `/products`, `/categories`)
 - `GET /stores?type=siswa|tefa` → Daftar toko yang sedang buka (`is_open=true`)
@@ -264,8 +264,8 @@ export const useAuthStore = defineStore('auth', {
     role: (state) => state.user?.role || 'guest',
   },
   actions: {
-    async login(nis_nip, password) {
-      const res = await apiClient.post('/auth/login', { nis_nip, password });
+    async login(email, password) {
+      const res = await apiClient.post('/auth/login', { email: email.trim().toLowerCase(), password });
       this.token = res.data.data.token;
       this.user = res.data.data.user;
       localStorage.setItem('auth_token', this.token);

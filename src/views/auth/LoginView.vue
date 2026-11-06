@@ -9,7 +9,7 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
-const nisNip = ref('');
+const email = ref('');
 const password = ref('');
 const isSubmitting = ref(false);
 const formError = ref('');
@@ -30,10 +30,10 @@ async function handleSubmit() {
   fieldErrors.value = {};
 
   try {
-    await authStore.login(nisNip.value, password.value);
+    await authStore.login(email.value.trim().toLowerCase(), password.value);
   } catch (error) {
     fieldErrors.value = getApiValidationErrors(error);
-    formError.value = getApiErrorMessage(error, 'Login gagal. Periksa NIS/NIP dan password Anda, lalu coba lagi.');
+    formError.value = getApiErrorMessage(error, 'Login gagal. Periksa email/password Anda atau gunakan NIS/NIP akun lama.');
     isSubmitting.value = false;
     return;
   }
@@ -53,24 +53,23 @@ async function handleSubmit() {
             <Icon icon="bx:arrow-back" width="24" height="24" />
           </router-link>
         </div>
-        <p>Masuk dengan NIS/NIP yang terdaftar di sekolah</p>
+        <p>Masuk dengan email dan password</p>
       </header>
 
       <form class="auth-form" @submit.prevent="handleSubmit">
         <div class="auth-fields">
           <div class="auth-field">
-            <label for="login-nis-nip">NIS/NIP</label>
+            <label for="login-email">Email</label>
             <input
-              id="login-nis-nip"
-              v-model.trim="nisNip"
-              name="nis_nip"
-              type="text"
-              inputmode="numeric"
-              autocomplete="username"
-              placeholder="Masukkan NIS atau NIP"
+              id="login-email"
+              v-model.trim="email"
+              name="email"
+              type="email"
+              autocomplete="email"
+              placeholder="Masukkan email"
               required
             />
-            <p v-if="fieldErrors.nis_nip" class="auth-error">{{ fieldErrors.nis_nip[0] }}</p>
+            <p v-if="fieldErrors.email" class="auth-error">{{ fieldErrors.email[0] }}</p>
           </div>
           <div class="auth-field">
             <label for="login-password">Password</label>

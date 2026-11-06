@@ -58,11 +58,18 @@ Backend sudah mengizinkan origin development dan method lengkap pada `config/cor
 
 #### 1. Login
 - **Endpoint**: `POST /api/v1/auth/login`
-- **Request Body**:
+- **Request Body utama**:
   ```json
   {
-    "nis_nip": "14146",
-    "password": "password"
+    "email": "buyer@example.com",
+    "password": "password123"
+  }
+  ```
+- **Legacy request** (akun lama):
+  ```json
+  {
+    "nis_nip": "NIS001",
+    "password": "password123"
   }
   ```
 - **Response Sukses (200 OK)**:
@@ -72,8 +79,9 @@ Backend sudah mengizinkan origin development dan method lengkap pada `config/cor
     "data": {
       "user": {
         "id": 1,
-        "nis_nip": "14146",
-        "name": "Altaf Azka Aviantara",
+        "email": "buyer@example.com",
+        "nis_nip": null,
+        "name": "Buyer",
         "role": "pembeli",
         "is_active": true
       },
@@ -98,8 +106,9 @@ Backend sudah mengizinkan origin development dan method lengkap pada `config/cor
     "success": true,
     "data": {
       "id": 1,
-      "nis_nip": "14146",
-      "name": "Altaf Azka Aviantara",
+      "email": "buyer@example.com",
+      "nis_nip": null,
+      "name": "Buyer",
       "role": "pembeli",
       "is_active": true
     }
@@ -126,16 +135,16 @@ Backend sudah mengizinkan origin development dan method lengkap pada `config/cor
 - **Request Body**:
   ```json
   {
-    "nis_nip": "14190",
-    "name": "Nama Pengguna",
+    "email": "buyer@example.com",
+    "name": "Buyer",
     "password": "password123",
     "password_confirmation": "password123"
   }
   ```
-- `nis_nip` wajib terdaftar di database sekolah dan belum digunakan.
-- Frontend menghapus spasi awal/akhir pada `nis_nip` dan `name`.
-- **422**: NIS/NIP tidak valid atau field wajib belum lengkap; tampilkan `errors.nis_nip[0]` bila tersedia.
-- **409**: NIS/NIP sudah pernah digunakan.
+- Frontend mengirim email setelah `trim()` dan `toLowerCase()`.
+- Register tidak memerlukan whitelist NIS/NIP.
+- **422**: email, name, password invalid atau field wajib belum lengkap; tampilkan `errors.email`, `errors.name`, `errors.password`.
+- **409**: email sudah digunakan.
 
 ### C. Browsing Toko & Produk
 
