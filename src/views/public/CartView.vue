@@ -183,7 +183,7 @@ async function handleCheckout() {
 
   const storeId = selectedStoreIds.value[0];
   const group = cartStore.cartGroups.find((item) => item.store_id === storeId);
-  await processCheckout(group?.cart_id, selectedItemIds.value);
+  router.push({ path: '/checkout', query: { cart_id: group?.cart_id || '' } });
 }
 
 onMounted(async () => {

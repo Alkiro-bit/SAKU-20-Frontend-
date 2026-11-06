@@ -1,24 +1,51 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { Icon } from '@iconify/vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useCartStore } from '@/stores/cart';
 import { getApiErrorMessage } from '@/services/api';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 
+const route = useRoute();
 const router = useRouter();
 const cartStore = useCartStore();
 const isSubmitting = ref(false);
 const error = ref('');
-const selectedStoreId = ref(null);
+const remainingSeconds = ref(10 * 60);
+let timerId;
+
+const formattedTime = computed(() => {
+  const minutes = Math.floor(remainingSeconds.value / 60).toString().padStart(2, '0');
+  const seconds = (remainingSeconds.value % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
+});
+
+onMounted(() => {
+  timerId = window.setInterval(() => {
+    if (remainingSeconds.value > 0) remainingSeconds.value -= 1;
+  }, 1000);
+});
+
+onUnmounted(() => window.clearInterval(timerId));
+
+function getSelectedItemIds() {
+  try {
+    const stored = sessionStorage.getItem('cart_selected_item_ids');
+    return stored ? JSON.parse(stored).map(Number).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
 
 const BMS_PER_ITEM = 1000;
 
 const activeGroup = computed(() => {
-  if (selectedStoreId.value) {
-    const found = cartStore.cartGroups.find((g) => g.store_id === selectedStoreId.value);
-    if (found) return found;
+  const routeCartId = route.query.cart_id;
+  if (routeCartId) {
+    const routeGroup = cartStore.cartGroups.find(
+      (group) => String(group.cart_id) === String(routeCartId)
+    );
+    if (routeGroup) return routeGroup;
   }
   return cartStore.cartGroups[0] || null;
 });
@@ -46,8 +73,18 @@ async function handleSimulatePaid() {
   error.value = '';
 
   try {
-    const order = await cartStore.checkout(activeGroup.value.cart_id);
-    router.replace({ path: `/orders/${order.id}`, query: { new: '1' } });
+    const selectedItemIds = getSelectedItemIds();
+    const order = await cartStore.checkout(
+      activeGroup.value.cart_id,
+      undefined,
+      selectedItemIds.length > 0 ? selectedItemIds : null
+    );
+    sessionStorage.removeItem('cart_selected_item_ids');
+    if (order?.id) {
+      router.replace({ path: `/orders/${order.id}`, query: { new: '1' } });
+    } else {
+      router.replace('/orders');
+    }
   } catch (e) {
     error.value = getApiErrorMessage(e, 'Checkout gagal. Coba lagi.');
   } finally {
@@ -61,13 +98,6 @@ async function handleSimulatePaid() {
     <MobileHeader />
 
     <main class="main-content">
-      <div class="page-title-wrap">
-        <button type="button" class="back-btn" @click="router.back()" aria-label="Kembali">
-          <Icon icon="bx:arrow-back" width="24" height="24" />
-        </button>
-        <h1 class="page-title">Checkout</h1>
-      </div>
-
       <div v-if="cartStore.isEmpty" class="empty-state">
         <p>Keranjang kosong. Tidak bisa checkout.</p>
         <button type="button" class="back-link" @click="router.push('/stores')">
@@ -76,75 +106,30 @@ async function handleSimulatePaid() {
       </div>
 
       <template v-else>
-        <div v-if="cartStore.cartGroups.length > 1" class="store-selector">
-          <p class="selector-label">Pilih toko yang ingin diproses:</p>
-          <div class="store-tabs">
-            <button
-              v-for="group in cartStore.cartGroups"
-              :key="group.store_id"
-              type="button"
-              class="store-tab"
-              :class="{ 'is-active': activeGroup?.store_id === group.store_id }"
-              @click="selectedStoreId = group.store_id"
-            >
-              {{ group.store_name }}
-            </button>
-          </div>
-        </div>
-
-        <section v-if="activeGroup" class="summary-card">
-          <h2 class="card-title">{{ activeGroup.store_name }}</h2>
-          <div class="summary-items">
-            <div v-for="item in activeGroup.items" :key="item.id" class="summary-row">
-              <span class="item-name">{{ item.name }} x{{ item.quantity }}</span>
-              <span class="item-price">{{ formatRupiah(item.price * item.quantity) }}</span>
-            </div>
-          </div>
-          <div class="divider"></div>
-          <div class="summary-row">
-            <span>Subtotal</span>
-            <span>{{ formatRupiah(subtotal) }}</span>
-          </div>
-          <div class="summary-row">
-            <span>Komisi BMS ({{ totalItems }} item × Rp1.000)</span>
-            <span>{{ formatRupiah(commission) }}</span>
-          </div>
-          <div class="divider"></div>
-          <div class="summary-row total-row">
-            <span>Total</span>
-            <span>{{ formatRupiah(grandTotal) }}</span>
-          </div>
+        <section class="payment-timer" aria-label="Batas waktu pembayaran">
+          <p>Complete payment in</p>
+          <strong>{{ formattedTime }}</strong>
         </section>
 
-        <section v-if="activeGroup" class="note-card">
-          <div class="note-header">
-            <span class="note-title">
-              <Icon icon="mdi:note-text-outline" width="18" height="18" />
-              Catatan untuk Penjual
-            </span>
-            <span class="char-count">{{ (cartStore.getSellerNote(activeGroup.store_id) || '').length }}/500</span>
+        <section class="qris-card" aria-label="Pembayaran QRIS">
+          <img src="/assets/qris1.png" alt="QRIS payment code" class="qris-image" />
+          <div class="payment-total">
+            <p>Payment Total</p>
+            <strong>{{ formatRupiah(grandTotal) }}</strong>
           </div>
-          <textarea
-            class="note-textarea"
-            maxlength="500"
-            :value="cartStore.getSellerNote(activeGroup.store_id)"
-            @input="cartStore.setSellerNote(activeGroup.store_id, $event.target.value)"
-            placeholder="Contoh: Tidak pedas, saus dipisah"
-            rows="2"
-          />
         </section>
 
         <p v-if="error" class="checkout-error" role="alert">{{ error }}</p>
 
         <div class="action-bar">
+          <button type="button" class="cancel-btn" @click="router.back()">Cancel</button>
           <button
             type="button"
             class="pay-btn"
-            :disabled="isSubmitting"
+            :disabled="isSubmitting || remainingSeconds === 0"
             @click="handleSimulatePaid"
           >
-            <Icon v-if="!isSubmitting" icon="mdi:qrcode-scan" width="20" height="20" />
-            {{ isSubmitting ? 'Memproses…' : 'Simulate Paid' }}
+            {{ isSubmitting ? 'Processing…' : remainingSeconds === 0 ? 'Payment Expired' : 'Check Payment' }}
           </button>
         </div>
       </template>
@@ -159,38 +144,80 @@ async function handleSimulatePaid() {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  padding-bottom: 85px;
+  padding-bottom: 80px;
+  background: #fff;
 }
 
 .main-content {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: 0 var(--space-2);
-}
-
-.page-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: var(--space-2) 0 var(--space-1);
-}
-
-.back-btn {
-  display: flex;
-  align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  color: var(--color-text);
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
 }
 
-.page-title {
+.payment-timer,
+.qris-card {
+  width: 100%;
+  border-radius: 10px;
+  background: #fff;
+  text-align: center;
+}
+
+.payment-timer {
+  padding: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.25);
+}
+
+.payment-timer p,
+.payment-total p {
+  margin: 0;
+  color: #000;
   font-family: var(--font-family-brand);
-  font-weight: var(--font-weight-medium);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.payment-timer strong {
+  display: block;
+  color: #000;
+  font-family: var(--font-family-brand);
   font-size: 24px;
-  color: var(--color-text);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.qris-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.25);
+}
+
+.qris-image {
+  display: block;
+  width: 253px;
+  height: 220px;
+  object-fit: cover;
+}
+
+.payment-total {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.payment-total strong {
+  color: #000;
+  font-family: var(--font-family-base);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .empty-state {
@@ -207,93 +234,10 @@ async function handleSimulatePaid() {
   font-weight: var(--font-weight-medium);
 }
 
-.store-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.selector-label {
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-}
-
-.store-tabs {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: none;
-}
-
-.store-tabs::-webkit-scrollbar {
+.store-selector,
+.summary-card,
+.note-card {
   display: none;
-}
-
-.store-tab {
-  padding: 6px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-surface);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all var(--transition-fast);
-}
-
-.store-tab.is-active {
-  background-color: rgba(30, 144, 255, 0.1);
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  font-weight: var(--font-weight-bold);
-}
-
-.summary-card {
-  background-color: var(--color-surface);
-  border-radius: 10px;
-  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.12);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.card-title {
-  font-family: var(--font-family-brand);
-  font-weight: var(--font-weight-medium);
-  font-size: 18px;
-  color: var(--color-text);
-}
-
-.summary-items {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-sm);
-  color: var(--color-text);
-}
-
-.item-name {
-  color: var(--color-text-muted);
-}
-
-.total-row {
-  font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-base);
-}
-
-.divider {
-  height: 1px;
-  background-color: #e5e7eb;
 }
 
 .checkout-error {
@@ -303,7 +247,25 @@ async function handleSimulatePaid() {
 }
 
 .action-bar {
-  padding: var(--space-1) 0;
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.cancel-btn,
+.pay-btn {
+  min-height: 50px;
+  border-radius: 10px;
+  font-family: var(--font-family-brand);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.cancel-btn {
+  width: 150px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #000;
 }
 
 .pay-btn {
@@ -311,15 +273,10 @@ async function handleSimulatePaid() {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  width: 100%;
-  min-height: 50px;
+  flex: 1;
   padding: var(--space-1);
-  border-radius: 10px;
   background-color: var(--color-primary);
   color: var(--color-text-on-accent);
-  font-family: var(--font-family-brand);
-  font-size: 18px;
-  font-weight: 600;
   transition: background-color var(--transition-fast);
 }
 
@@ -330,16 +287,6 @@ async function handleSimulatePaid() {
 .pay-btn:disabled {
   opacity: 0.7;
   cursor: wait;
-}
-
-.note-card {
-  background-color: var(--color-surface);
-  border-radius: 10px;
-  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.12);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .note-header {
