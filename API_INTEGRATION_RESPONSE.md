@@ -120,7 +120,24 @@ Backend sudah mengizinkan origin development dan method lengkap pada `config/cor
 
 ---
 
-### B. Browsing Toko & Produk
+### B. Registrasi Akun
+
+- **Endpoint**: `POST /api/v1/auth/register`
+- **Request Body**:
+  ```json
+  {
+    "nis_nip": "14190",
+    "name": "Nama Pengguna",
+    "password": "password123",
+    "password_confirmation": "password123"
+  }
+  ```
+- `nis_nip` wajib terdaftar di database sekolah dan belum digunakan.
+- Frontend menghapus spasi awal/akhir pada `nis_nip` dan `name`.
+- **422**: NIS/NIP tidak valid atau field wajib belum lengkap; tampilkan `errors.nis_nip[0]` bila tersedia.
+- **409**: NIS/NIP sudah pernah digunakan.
+
+### C. Browsing Toko & Produk
 
 #### 1. Daftar Toko
 - **Endpoint**: `GET /api/v1/stores` (Opsional query: `?type=siswa` atau `?type=tefa`)

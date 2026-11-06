@@ -33,8 +33,8 @@ async function handleSubmit() {
 
   try {
     await authStore.register({
-      nis_nip: nisNip.value,
-      name: name.value,
+      nis_nip: nisNip.value.trim(),
+      name: name.value.trim(),
       password: password.value,
       password_confirmation: passwordConfirmation.value,
     });

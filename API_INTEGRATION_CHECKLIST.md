@@ -85,7 +85,27 @@ Frontend mengirim token pada request berikutnya:
 Authorization: Bearer TOKEN
 ```
 
-## 5. Format Produk
+## 5. Registrasi Akun
+
+Endpoint: `POST /api/v1/auth/register`
+
+Request wajib:
+
+```json
+{
+  "nis_nip": "14190",
+  "name": "Nama Pengguna",
+  "password": "password123",
+  "password_confirmation": "password123"
+}
+```
+
+`nis_nip` harus terdaftar di database sekolah dan belum digunakan. Frontend menghapus spasi awal/akhir pada `nis_nip` dan `name`; validasi tetap dilakukan backend.
+
+- `422`: NIS/NIP tidak valid atau field wajib belum lengkap. Tampilkan `response.errors.nis_nip[0]` bila tersedia.
+- `409`: NIS/NIP sudah pernah digunakan.
+
+## 6. Format Produk
 
 ```json
 {
