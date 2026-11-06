@@ -94,7 +94,7 @@ onBeforeUnmount(() => {
 
 .logo {
   font-family: var(--font-family-brand);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   font-size: 20px;
   color: var(--color-primary);
   letter-spacing: -2px;

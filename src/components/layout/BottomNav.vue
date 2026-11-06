@@ -18,6 +18,7 @@ function isActive(tab) {
   const currentPath = route.path.startsWith('/products/') ? getLastMainPath() : route.path;
   const basePath = currentPath.split('?')[0].split('#')[0];
   if (tab.path === '/') return basePath === '/';
+  if (tab.path === '/cart' && basePath === '/checkout') return true;
   return basePath.startsWith(tab.path);
 }
 </script>

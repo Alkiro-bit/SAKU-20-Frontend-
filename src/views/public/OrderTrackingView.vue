@@ -18,11 +18,11 @@ const error = ref('');
 const orderId = computed(() => route.params.id);
 
 const storeDisplayName = computed(() =>
-  order.value?.store_name ||
   order.value?.store?.name ||
+  order.value?.store_name ||
   order.value?.cart?.store_name ||
   order.value?.cart?.store?.name ||
-  'Store'
+  'Store unavailable'
 );
 
 const orderItems = computed(() => {
@@ -237,7 +237,7 @@ onMounted(async () => {
   margin: 4px 0 0;
   font-family: var(--font-family-brand);
   font-size: 20px;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   color: var(--color-text);
 }
 
