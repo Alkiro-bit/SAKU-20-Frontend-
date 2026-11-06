@@ -17,6 +17,26 @@ const error = ref('');
 
 const orderId = computed(() => route.params.id);
 
+const storeDisplayName = computed(() =>
+  order.value?.store_name ||
+  order.value?.store?.name ||
+  order.value?.cart?.store_name ||
+  order.value?.cart?.store?.name ||
+  'Store'
+);
+
+const orderItems = computed(() => {
+  const items = order.value?.items || order.value?.order_items || [];
+  return items.map((item) => ({
+    ...item,
+    id: item.id || item.cart_item_id || item.product_id,
+    name: item.name || item.product_name || item.product?.name || item.menu_item?.name || 'Item',
+    image: item.image || item.product?.image || item.product?.image_url || item.menu_item?.image,
+    quantity: item.quantity || item.qty || 0,
+    price: item.price ?? item.unit_price ?? item.product?.price ?? 0,
+  }));
+});
+
 const isFinalStatus = computed(() =>
   ['selesai', 'dibatalkan'].includes(order.value?.status)
 );
@@ -77,14 +97,14 @@ onMounted(async () => {
 
     <main class="main-content">
       <div class="page-title-wrap">
-        <button type="button" class="back-btn" @click="router.push('/orders')" aria-label="Kembali">
+        <button type="button" class="back-btn" @click="router.push('/orders')" aria-label="Go back">
           <Icon icon="bx:arrow-back" width="24" height="24" />
         </button>
-        <h1 class="page-title">Detail Pesanan</h1>
+        <h1 class="page-title">Order Details</h1>
       </div>
 
       <div v-if="loading" class="loading-state">
-        <p>Memuat…</p>
+        <p>Loading…</p>
       </div>
 
       <p v-else-if="error" class="tracking-error" role="alert">{{ error }}</p>
@@ -92,18 +112,24 @@ onMounted(async () => {
       <template v-else-if="order">
         <!-- Pickup Info Card -->
         <section class="pickup-card">
+          <div class="status-heading">
+            <div>
+              <span class="section-kicker">ORDER STATUS</span>
+              <h2>Pesanan {{ order.id ? `#${order.id}` : '' }}</h2>
+            </div>
+            <StatusBadge :status="order.status" />
+          </div>
           <div class="pickup-main">
             <div class="pickup-block">
-              <span class="pickup-label">Nomor Antrian</span>
+              <span class="pickup-label">Queue Number</span>
               <span class="pickup-big">{{ order.queue_number }}</span>
             </div>
             <div class="pickup-divider"></div>
             <div class="pickup-block">
-              <span class="pickup-label">Kode Pickup</span>
+              <span class="pickup-label">Pickup Code</span>
               <span class="pickup-big pickup-code">{{ order.pickup_code }}</span>
             </div>
           </div>
-          <StatusBadge :status="order.status" />
           <p v-if="!isFinalStatus" class="polling-hint">
             <Icon icon="mdi:loading" width="14" height="14" class="spin" />
             Status diperbarui otomatis
@@ -112,9 +138,15 @@ onMounted(async () => {
 
         <!-- Order Items -->
         <section class="items-card">
-          <h2 class="card-title">{{ order.store_name }}</h2>
+          <div class="store-heading">
+            <div class="store-icon"><Icon icon="mdi:storefront-outline" width="20" height="20" /></div>
+            <div>
+              <span class="section-kicker">ORDER FROM</span>
+              <h2 class="card-title">{{ storeDisplayName }}</h2>
+            </div>
+          </div>
           <div class="item-list">
-            <div v-for="item in order.items" :key="item.id" class="item-row">
+            <div v-for="item in orderItems" :key="item.id" class="item-row">
               <div class="item-thumb" v-if="item.image">
                 <img :src="item.image" :alt="item.name" loading="lazy" />
               </div>
@@ -126,7 +158,7 @@ onMounted(async () => {
           </div>
           <div class="divider"></div>
           <div class="total-row">
-            <span>Total</span>
+            <span>Payment Total</span>
             <span>{{ formatRupiah(order.total) }}</span>
           </div>
         </section>
@@ -135,7 +167,7 @@ onMounted(async () => {
         <section v-if="order.seller_note" class="note-card">
           <div class="note-header">
             <Icon icon="mdi:note-text-outline" width="18" height="18" />
-            <span class="note-title">Catatan untuk Penjual</span>
+            <span class="note-title">Note for Seller</span>
           </div>
           <p class="note-body">{{ order.seller_note }}</p>
         </section>
@@ -152,13 +184,14 @@ onMounted(async () => {
   flex-direction: column;
   min-height: 100vh;
   padding-bottom: 85px;
+  background: #fff;
 }
 
 .main-content {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: 0 var(--space-2);
+  gap: 14px;
+  padding: 0 12px;
 }
 
 .page-title-wrap {
@@ -176,6 +209,13 @@ onMounted(async () => {
   height: 40px;
   border-radius: 50%;
   color: var(--color-text);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.back-btn:hover,
+.back-btn:focus-visible {
+  background: rgba(30, 144, 255, 0.1);
+  color: var(--color-primary);
 }
 
 .page-title {
@@ -183,6 +223,30 @@ onMounted(async () => {
   font-weight: var(--font-weight-medium);
   font-size: 24px;
   color: var(--color-text);
+}
+
+.status-heading,
+.store-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.status-heading h2 {
+  margin: 4px 0 0;
+  font-family: var(--font-family-brand);
+  font-size: 20px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.section-kicker {
+  color: var(--color-text-muted);
+  font-family: var(--font-family-base);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .loading-state {
@@ -199,21 +263,22 @@ onMounted(async () => {
 
 .pickup-card {
   background-color: var(--color-surface);
-  border-radius: 10px;
-  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.12);
-  padding: 20px 16px;
+  border-radius: 14px;
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.1);
+  padding: 18px 16px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .pickup-main {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 20px;
   width: 100%;
-  justify-content: center;
+  padding: 14px 10px;
+  border-radius: 10px;
+  background: rgba(30, 144, 255, 0.06);
 }
 
 .pickup-block {
@@ -242,8 +307,8 @@ onMounted(async () => {
 
 .pickup-divider {
   width: 1px;
-  height: 50px;
-  background-color: #e5e7eb;
+  height: 56px;
+  background-color: rgba(30, 144, 255, 0.2);
 }
 
 .polling-hint {
@@ -264,17 +329,28 @@ onMounted(async () => {
 
 .items-card {
   background-color: var(--color-surface);
-  border-radius: 10px;
-  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.08);
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+}
+
+.store-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  color: var(--color-primary);
+  background: rgba(30, 144, 255, 0.1);
 }
 
 .card-title {
+  margin: 4px 0 0;
   font-family: var(--font-family-brand);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-bold);
   font-size: 18px;
   color: var(--color-text);
 }
@@ -289,6 +365,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 8px 0;
 }
 
 .item-thumb {
@@ -333,16 +410,23 @@ onMounted(async () => {
 .total-row {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
   font-family: var(--font-family-base);
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-base);
   color: var(--color-text);
 }
 
+.total-row span:last-child {
+  color: var(--color-primary);
+  font-size: 20px;
+}
+
 .note-card {
   background-color: var(--color-surface);
-  border-radius: 10px;
-  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.08);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -371,6 +455,6 @@ onMounted(async () => {
   background-color: #f9fafb;
   padding: 10px 12px;
   border-radius: 8px;
-  border-left: 3px solid var(--color-primary);
+  border: 1px solid rgba(30, 144, 255, 0.16);
 }
 </style>
