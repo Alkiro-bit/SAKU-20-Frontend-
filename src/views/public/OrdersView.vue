@@ -5,7 +5,7 @@ import { Icon } from '@iconify/vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
-import { apiClient, getApiErrorMessage } from '@/services/api';
+import { apiClient, getApiErrorMessage, resolveImageUrl } from '@/services/api';
 
 const router = useRouter();
 const orders = ref([]);
@@ -27,6 +27,18 @@ async function fetchOrders() {
 
 function viewOrder(order) {
   router.push(`/orders/${order.id}`);
+}
+
+function getStoreName(order) {
+  return order.store_name || order.store?.name || 'Toko';
+}
+
+function getOrderItems(order) {
+  return Array.isArray(order.items) ? order.items : [];
+}
+
+function getItemImage(item) {
+  return resolveImageUrl(item?.image || null);
 }
 
 // ponytail: status mapping uses backend enum values (diproses, siap_diambil, selesai, dibatalkan)
@@ -64,20 +76,37 @@ onMounted(fetchOrders);
           @click="viewOrder(order)"
         >
           <div class="order-header">
-            <span class="store-name">{{ order.store_name }}</span>
+            <span class="store-name">{{ getStoreName(order) }}</span>
             <StatusBadge :status="order.status" />
           </div>
 
           <div class="order-body">
-            <div class="product-info-col">
-              <div v-if="order.items && order.items[0]" class="product-thumb">
-                <img :src="order.items[0].image" :alt="order.items[0].name" loading="lazy" />
+            <div class="product-list">
+              <div
+                v-for="(item, idx) in getOrderItems(order)"
+                :key="'order-' + order.id + '-item-' + (item.id || item.product_id || idx)"
+                class="product-row"
+              >
+                <div class="product-thumb">
+                  <img
+                    :src="getItemImage(item)"
+                    :alt="item.name || 'Produk'"
+                    loading="lazy"
+                  />
+                </div>
+                <div class="product-meta">
+                  <p class="product-name">{{ item.name || 'Produk' }}</p>
+                  <p class="product-qty">{{ item.quantity ? `${item.quantity}x` : '' }}</p>
+                </div>
               </div>
-              <div class="product-meta">
-                <p class="product-name">{{ order.items?.[0]?.name || 'Produk' }}</p>
-                <p v-if="order.items && order.items.length > 1" class="product-qty">
-                  +{{ order.items.length - 1 }} produk lainnya
-                </p>
+
+              <div v-if="getOrderItems(order).length === 0" class="product-row">
+                <div class="product-thumb">
+                  <img :src="getItemImage(null)" alt="Produk" loading="lazy" />
+                </div>
+                <div class="product-meta">
+                  <p class="product-name">Produk</p>
+                </div>
               </div>
             </div>
 
@@ -187,22 +216,30 @@ onMounted(fetchOrders);
 
 .order-body {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
+  gap: 12px;
   padding: 12px 14px;
 }
 
-.product-info-col {
+.product-list {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
   min-width: 0;
   flex: 1;
 }
 
+.product-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .product-thumb {
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   border-radius: 6px;
   overflow: hidden;
   background-color: #f3f4f6;
