@@ -211,7 +211,40 @@ Backend sudah mengizinkan origin development dan method lengkap pada `config/cor
 
 > **Penting**: Keranjang belanja di backend terikat per-toko (`store_id`). Satu cart hanya menampung produk dari satu toko yang sama.
 
-#### 1. Lihat Cart Toko
+#### 1. Lihat Seluruh Cart Pengguna
+- **Endpoint**: `GET /api/v1/cart` (tanpa query parameter)
+- **Response Sukses (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "store_id": 1,
+        "store_name": "JungleFood",
+        "items": [
+          {
+            "id": 1,
+            "product_id": 1,
+            "quantity": 2,
+            "product": {
+              "id": 1,
+              "store_id": 1,
+              "category_id": 1,
+              "name": "Nasi Goreng Spesial",
+              "description": null,
+              "price": 12000,
+              "stock": 15,
+              "image_url": "products/nasi-goreng-spesial.webp"
+            }
+          }
+        ]
+      }
+    ]
+  }
+  ```
+
+#### 2. Lihat Cart Toko
 - **Endpoint**: `GET /api/v1/cart?store_id={id}`
 - **Headers**: `Authorization: Bearer <token>`
 - **Response Sukses (200 OK)**:

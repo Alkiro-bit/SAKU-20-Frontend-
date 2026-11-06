@@ -209,6 +209,7 @@ Format respons backend konsisten:
 
 ### 5.3 Keranjang Belanja (`/cart`)
 *Catatan: Backend menggunakan keranjang terpisah untuk setiap pasangan (user_id, store_id). Frontend menggabungkan tampilan seluruh cart toko dalam satu halaman `/cart`. Saat checkout, proses dilakukan per-toko.*
+- `GET /cart` → Ambil seluruh keranjang aktif milik user yang sedang login (mengembalikan array keranjang per toko)
 - `GET /cart?store_id=:store_id` → Ambil isi keranjang pada toko tsb (response menyertakan `id` cart)
 - `POST /cart/items` — Body: `{ store_id, product_id, quantity }`
 - `PATCH /cart/items/:item_id` — Body: `{ quantity }`

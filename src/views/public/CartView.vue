@@ -6,6 +6,7 @@ import { useCartStore } from '@/stores/cart';
 import { getApiErrorMessage } from '@/services/api';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
+import StoreSelectionWarningModal from '@/components/modules/StoreSelectionWarningModal.vue';
 
 const router = useRouter();
 const cartStore = useCartStore();
@@ -171,7 +172,7 @@ async function processCheckout(cartId, itemIds = null) {
 async function handleCheckout() {
   error.value = '';
   if (!hasSelection.value) {
-    error.value = 'Pilih minimal satu produk untuk checkout.';
+    error.value = 'Select at least one item to check out.';
     return;
   }
   if (selectedStoreIds.value.length > 1) {
@@ -227,7 +228,7 @@ onMounted(async () => {
                 :checked="isStoreSelected(group)"
                 :ref="(element) => { if (element) element.indeterminate = isStorePartiallySelected(group); }"
                 @change="toggleStore(group, $event)"
-                :aria-label="`Pilih semua produk dari ${group.store_name}`"
+                :aria-label="`Select all items from ${group.store_name}`"
               />
               <Icon icon="mdi:store" width="20" height="20" />
             </label>
@@ -249,7 +250,7 @@ onMounted(async () => {
                     type="checkbox"
                     :checked="isItemSelected(item)"
                     @change="toggleItem(item, $event)"
-                    :aria-label="`Pilih ${item.name}`"
+                    :aria-label="`Select ${item.name}`"
                   />
                 </label>
                 <div class="product-thumb">
@@ -267,7 +268,7 @@ onMounted(async () => {
                   class="remove-btn"
                   :disabled="updatingItem === item.id"
                   @click="handleRemove(item)"
-                  aria-label="Hapus Item"
+                  aria-label="Remove item"
                 >
                   <Icon icon="mdi:trash-can-outline" width="18" height="18" />
                 </button>
@@ -278,7 +279,7 @@ onMounted(async () => {
                     class="qty-btn"
                     :disabled="item.quantity <= 1 || updatingItem === item.id"
                     @click="handleDecrement(item)"
-                    aria-label="Kurangi Jumlah"
+                    aria-label="Decrease quantity"
                   >
                     <Icon icon="akar-icons:minus" width="14" height="14" />
                   </button>
@@ -288,7 +289,7 @@ onMounted(async () => {
                     class="qty-btn"
                     :disabled="updatingItem === item.id"
                     @click="handleIncrement(item)"
-                    aria-label="Tambah Jumlah"
+                    aria-label="Increase quantity"
                   >
                     <Icon icon="akar-icons:plus" width="14" height="14" />
                   </button>
@@ -301,7 +302,7 @@ onMounted(async () => {
             <div class="note-header">
               <span class="note-label">
                 <Icon icon="mdi:note-text-outline" width="16" height="16" />
-                Catatan untuk Penjual
+                Note for the seller
               </span>
               <span class="char-count">{{ (cartStore.getSellerNote(group.store_id) || '').length }}/500</span>
             </div>
@@ -310,7 +311,7 @@ onMounted(async () => {
               maxlength="500"
               :value="cartStore.getSellerNote(group.store_id)"
               @input="cartStore.setSellerNote(group.store_id, $event.target.value)"
-              placeholder="Contoh: Tidak pedas, saus dipisah"
+              placeholder="e.g., Not spicy, sauce on the side"
               rows="2"
             />
           </div>
@@ -333,27 +334,7 @@ onMounted(async () => {
       </button>
     </div>
 
-    <div
-      v-if="showSelectionWarning"
-      class="modal-backdrop"
-      @click.self="closeSelectionWarning"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="selection-warning-title"
-    >
-      <div class="modal-card">
-        <div class="modal-header">
-          <h2 id="selection-warning-title" class="modal-title">Produk berbeda toko</h2>
-          <button type="button" class="modal-close-btn" @click="closeSelectionWarning" aria-label="Tutup dialog">
-            <Icon icon="akar-icons:cross" width="16" height="16" />
-          </button>
-        </div>
-        <p class="modal-warning">Checkout hanya bisa dilakukan dari satu toko. Selesaikan checkout toko ini terlebih dahulu, lalu pilih toko lain.</p>
-        <div class="modal-footer">
-          <button type="button" class="modal-cancel-btn" @click="closeSelectionWarning">Mengerti</button>
-        </div>
-      </div>
-    </div>
+    <StoreSelectionWarningModal v-if="showSelectionWarning" @close="closeSelectionWarning" />
 
     <BottomNav />
   </div>
@@ -636,63 +617,6 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 
-/* Modal styles */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 100;
-}
-
-.modal-card {
-  background-color: var(--color-surface);
-  border-radius: 12px;
-  width: 100%;
-  max-width: 400px;
-  padding: 20px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.modal-title {
-  font-family: var(--font-family-brand);
-  font-weight: var(--font-weight-medium);
-  font-size: 18px;
-  color: var(--color-text);
-}
-
-.modal-close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  color: var(--color-text-muted);
-}
-
-.modal-warning {
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-sm);
-  color: #b42318;
-  background-color: #fef3f2;
-  border: 1px solid #fee4e2;
-  border-radius: 8px;
-  padding: 10px 12px;
-  line-height: 1.4;
-}
-
 .modal-store-list {
   display: flex;
   flex-direction: column;
@@ -746,20 +670,6 @@ onMounted(async () => {
   padding: 4px 10px;
   border: 1px solid var(--color-primary);
   border-radius: 6px;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 4px;
-}
-
-.modal-cancel-btn {
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-sm);
-  padding: 8px 16px;
-  border-radius: 6px;
-  color: var(--color-text-muted);
 }
 
 .cart-seller-note {

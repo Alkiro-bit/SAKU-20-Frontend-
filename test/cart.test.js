@@ -64,6 +64,42 @@ test('1. cart dari beberapa toko tampil bersamaan', () => {
   assert.strictEqual(store.isEmpty, false);
 });
 
+test('item yang baru ditambahkan tampil paling atas setelah cart dimuat ulang', async () => {
+  const store = setupTestCartStore();
+  const olderCart = {
+    id: 202,
+    store_id: 2,
+    store_name: 'TEFA Bakery',
+    items: [{ id: 21, product_id: 3, name: 'Item toko lain', price: 6000, quantity: 1 }],
+  };
+  store.upsertGroup(createStoreGroup(olderCart));
+  const latestCart = {
+    id: 101,
+    store_id: 1,
+    store_name: 'Kantin Sekolah',
+    items: [
+      { id: 11, product_id: 1, name: 'Item lama', price: 5000, quantity: 1 },
+      { id: 12, product_id: 2, name: 'Item baru', price: 8000, quantity: 1 },
+    ],
+  };
+  apiClient.post = async () => ({ data: { data: latestCart } });
+
+  await store.addItem(1, 2);
+
+  assert.deepStrictEqual(store.cartGroups.map((group) => group.store_id), [1, 2]);
+  assert.deepStrictEqual(store.cartGroups[0].items.map((item) => item.id), [12, 11]);
+
+  setActivePinia(createPinia());
+  const reloadedStore = useCartStore();
+  reloadedStore.upsertGroup(createStoreGroup(olderCart));
+  reloadedStore.upsertGroup(createStoreGroup({
+    ...latestCart,
+    items: [...latestCart.items].reverse(),
+  }));
+  assert.deepStrictEqual(reloadedStore.cartGroups.map((group) => group.store_id), [1, 2]);
+  assert.deepStrictEqual(reloadedStore.cartGroups[0].items.map((item) => item.id), [12, 11]);
+});
+
 test('2. checkout satu toko', async () => {
   const store = setupTestCartStore();
 
@@ -375,4 +411,105 @@ test('11. seller_note terhapus setelah checkout berhasil', async () => {
 
   // Catatan untuk toko 5 harus terhapus setelah sukses checkout
   assert.strictEqual(store.getSellerNote(5), '');
+});
+
+test('12. fetchAllCarts memuat seluruh cart dari endpoint GET /cart', async () => {
+  const store = setupTestCartStore();
+
+  const originalGet = apiClient.get;
+  apiClient.get = async (url) => {
+    if (url === '/cart') {
+      return {
+        data: {
+          success: true,
+          data: [
+            {
+              id: 101,
+              store_id: 1,
+              store_name: 'Kantin Sekolah',
+              items: [
+                { id: 1, product_id: 11, name: 'Nasi Goreng', price: 12000, quantity: 2 },
+              ],
+            },
+            {
+              id: 202,
+              store_id: 2,
+              store_name: 'TEFA Bakery',
+              items: [
+                { id: 2, product_id: 22, name: 'Roti Cokelat', price: 8000, quantity: 1 },
+              ],
+            },
+          ],
+        },
+      };
+    }
+    return originalGet(url);
+  };
+
+  try {
+    const groups = await store.fetchAllCarts();
+    assert.strictEqual(groups.length, 2);
+    assert.strictEqual(store.cartGroups.length, 2);
+    assert.strictEqual(store.itemCount, 3);
+    assert.strictEqual(store.totalPrice, 32000);
+  } finally {
+    apiClient.get = originalGet;
+  }
+});
+
+test('13. fetchAllCarts fallback ke local store_ids jika GET /cart mengembalikan error', async () => {
+  const store = setupTestCartStore();
+
+  const originalGet = apiClient.get;
+  apiClient.get = async (url, config) => {
+    if (url === '/cart' && !config?.params?.store_id) {
+      const err = new Error('store_id is required');
+      err.response = { status: 400, data: { message: 'store_id is required' } };
+      throw err;
+    }
+    if (config?.params?.store_id === 1) {
+      return {
+        data: {
+          data: {
+            id: 101,
+            store_id: 1,
+            store_name: 'Fallback Toko',
+            items: [
+              { id: 1, product_id: 11, name: 'Bakso', price: 10000, quantity: 1 },
+            ],
+          },
+        },
+      };
+    }
+    return { data: { data: null } };
+  };
+
+  try {
+    globalThis.localStorage.setItem('cart_store_ids', JSON.stringify([1]));
+    const groups = await store.fetchAllCarts();
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].store_id, 1);
+    assert.strictEqual(groups[0].items[0].name, 'Bakso');
+  } finally {
+    apiClient.get = originalGet;
+  }
+});
+
+test('14. fetchAllCarts menampilkan error selain respons backend lama', async () => {
+  const store = setupTestCartStore();
+  store.upsertGroup(createStoreGroup({
+    id: 101,
+    store_id: 1,
+    store_name: 'Cart tersimpan',
+    items: [{ id: 1, product_id: 11, name: 'Bakso', price: 10000, quantity: 1 }],
+  }));
+  apiClient.get = async () => {
+    const error = new Error('Server error');
+    error.response = { status: 500, data: { message: 'Internal Server Error' } };
+    throw error;
+  };
+
+  await assert.rejects(store.fetchAllCarts(), /Server error/);
+  assert.strictEqual(store.cartGroups.length, 1);
+  assert.strictEqual(store.loading, false);
 });

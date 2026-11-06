@@ -4,9 +4,80 @@ import { apiClient, resolveImageUrl, getStore } from '@/services/api';
 const CART_STORE_IDS_KEY = 'cart_store_ids';
 const LEGACY_CART_STORE_ID_KEY = 'cart_store_id';
 const CART_SELLER_NOTES_KEY = 'cart_seller_notes';
+const CART_ITEM_ADDED_AT_KEY = 'cart_item_added_at';
 
 function getStorage() {
   return typeof localStorage !== 'undefined' ? localStorage : null;
+}
+
+function getStoredCartItemAddedAt() {
+  const storage = getStorage();
+  if (!storage) return {};
+  try {
+    const stored = JSON.parse(storage.getItem(CART_ITEM_ADDED_AT_KEY) || '{}');
+    return stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveStoredCartItemAddedAt(addedAt) {
+  const storage = getStorage();
+  if (storage) storage.setItem(CART_ITEM_ADDED_AT_KEY, JSON.stringify(addedAt));
+}
+
+function getItemAddedAt(raw, storeId) {
+  const storedValue = raw.id != null
+    ? getStoredCartItemAddedAt()[`${storeId}:${raw.id}`]
+    : null;
+  const value = storedValue ?? raw.added_at ?? raw.addedAt ?? raw.created_at ?? raw.createdAt;
+  if (typeof value === 'number') return value;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function sortItemsNewestFirst(items) {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      if (a.item.added_at == null) return b.item.added_at == null ? a.index - b.index : 1;
+      if (b.item.added_at == null) return -1;
+      return b.item.added_at - a.item.added_at || a.index - b.index;
+    })
+    .map(({ item }) => item);
+}
+
+function sortGroupsNewestFirst(groups) {
+  return groups
+    .map((group, index) => ({
+      group,
+      index,
+      addedAt: group.items.reduce(
+        (newest, item) => item.added_at == null ? newest : Math.max(newest, item.added_at),
+        null
+      ),
+    }))
+    .sort((a, b) => {
+      if (a.addedAt == null) return b.addedAt == null ? a.index - b.index : 1;
+      if (b.addedAt == null) return -1;
+      return b.addedAt - a.addedAt || a.index - b.index;
+    })
+    .map(({ group }) => group);
+}
+
+function markProductAsRecentlyAdded(storeId, cart, productId) {
+  const addedAt = getStoredCartItemAddedAt();
+  const matchingItem = (cart.items || []).find((item) =>
+    Number(item.product_id ?? item.product?.id) === Number(productId)
+  );
+  if (matchingItem?.id != null) {
+    const newestAddedAt = Object.values(addedAt).reduce(
+      (newest, value) => (Number.isFinite(value) ? Math.max(newest, value) : newest),
+      0
+    );
+    addedAt[`${Number(storeId)}:${matchingItem.id}`] = Math.max(Date.now(), newestAddedAt + 1);
+    saveStoredCartItemAddedAt(addedAt);
+  }
 }
 
 export function normalizeCartItem(raw, defaultStoreId = null) {
@@ -22,6 +93,7 @@ export function normalizeCartItem(raw, defaultStoreId = null) {
     quantity: Number(raw.quantity || 1),
     image: resolveImageUrl(product.image_url || raw.image || raw.image_url),
     rawProduct: product,
+    added_at: getItemAddedAt(raw, storeId),
   };
 }
 
@@ -29,7 +101,9 @@ export function createStoreGroup(rawCart, fallbackStoreId = null, fallbackStoreN
   const storeId = Number(rawCart.store_id ?? rawCart.storeId ?? fallbackStoreId);
   const cartId = rawCart.id ?? rawCart.cart_id ?? rawCart.cartId ?? null;
   const storeName = rawCart.store_name || rawCart.store?.name || fallbackStoreName || (storeId ? `Toko #${storeId}` : 'Toko');
-  const items = (rawCart.items || []).map((item) => normalizeCartItem(item, storeId));
+  const items = sortItemsNewestFirst(
+    (rawCart.items || []).map((item) => normalizeCartItem(item, storeId))
+  );
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
   const sellerNote = rawCart.seller_note || rawCart.sellerNote || null;
@@ -107,10 +181,11 @@ export const useCartStore = defineStore('cart', {
   }),
   getters: {
     cartGroups(state) {
-      return state.groups.filter((g) => g.items && g.items.length > 0);
+      return sortGroupsNewestFirst(state.groups.filter((g) => g.items && g.items.length > 0));
     },
     items(state) {
-      return state.groups.flatMap((g) => g.items || []);
+      return sortGroupsNewestFirst(state.groups.filter((g) => g.items && g.items.length > 0))
+        .flatMap((g) => g.items || []);
     },
     totalPrice(state) {
       return state.groups.reduce((sum, g) => sum + (g.subtotal || 0), 0);
@@ -261,14 +336,44 @@ export const useCartStore = defineStore('cart', {
     },
 
     async fetchAllCarts(storeIds = null) {
-      const ids = storeIds || getStoredStoreIds();
-      if (!ids.length) {
-        this.groups = [];
-        return [];
-      }
       this.loading = true;
       try {
-        await Promise.allSettled(ids.map((id) => this.fetchCart(id)));
+        if (storeIds && storeIds.length > 0) {
+          await Promise.all(storeIds.map((id) => this.fetchCart(id)));
+          return this.cartGroups;
+        }
+
+        try {
+          const res = await apiClient.get('/cart');
+          const data = res.data?.data;
+          if (Array.isArray(data)) {
+            this.groups = data
+              .filter((c) => c && c.items && c.items.length > 0)
+              .map((cart) => {
+                const group = createStoreGroup(cart);
+                const storedNote = this.sellerNotes[String(group.store_id)];
+                if (storedNote && !group.seller_note) {
+                  group.seller_note = storedNote;
+                }
+                return group;
+              });
+            this.persistStoreIds();
+            return this.cartGroups;
+          }
+          throw new Error('Respons GET /cart tidak berisi daftar keranjang yang valid.');
+        } catch (error) {
+          const isLegacyEndpointError =
+            error.response?.status === 400 &&
+            error.response?.data?.message === 'store_id is required';
+          if (!isLegacyEndpointError) throw error;
+        }
+
+        const ids = getStoredStoreIds();
+        if (!ids.length) {
+          this.groups = [];
+          return [];
+        }
+        await Promise.all(ids.map((id) => this.fetchCart(id)));
         return this.cartGroups;
       } finally {
         this.loading = false;
@@ -286,6 +391,7 @@ export const useCartStore = defineStore('cart', {
       });
       const latestCart = res.data?.data;
       if (latestCart && latestCart.items) {
+        markProductAsRecentlyAdded(storeId, latestCart, productId);
         const existing = this.groups.find((g) => g.store_id === Number(storeId));
         let storeName = latestCart.store_name || latestCart.store?.name || existing?.store_name;
         if (!storeName) {
@@ -425,8 +531,8 @@ export const useCartStore = defineStore('cart', {
         storage.removeItem(CART_STORE_IDS_KEY);
         storage.removeItem(LEGACY_CART_STORE_ID_KEY);
         storage.removeItem(CART_SELLER_NOTES_KEY);
+        storage.removeItem(CART_ITEM_ADDED_AT_KEY);
       }
     },
   },
 });
-

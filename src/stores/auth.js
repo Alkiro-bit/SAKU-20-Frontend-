@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { apiClient } from '@/services/api';
+import { useCartStore } from '@/stores/cart';
 
 const AUTH_TOKEN_KEY = 'auth_token';
 const USER_DATA_KEY = 'user_data';
@@ -28,6 +29,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = null;
       localStorage.removeItem(AUTH_TOKEN_KEY);
       localStorage.removeItem(USER_DATA_KEY);
+      useCartStore().resetCart();
     },
     async login(nisNip, password) {
       const res = await apiClient.post('/auth/login', { nis_nip: nisNip, password });
