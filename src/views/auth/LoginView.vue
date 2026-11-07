@@ -15,11 +15,15 @@ const isSubmitting = ref(false);
 const formError = ref('');
 const fieldErrors = ref({});
 
-function getRedirectPath() {
+function getRedirectPath(role) {
   const redirect = route.query.redirect;
-  return typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
-    ? redirect
-    : '/';
+  if (typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect;
+  }
+
+  if (role === 'admin') return '/admin/dashboard';
+  if (role === 'superadmin') return '/superadmin/dashboard';
+  return '/';
 }
 
 async function handleSubmit() {
@@ -39,7 +43,7 @@ async function handleSubmit() {
   }
 
   isSubmitting.value = false;
-  await router.replace(getRedirectPath());
+  await router.replace(getRedirectPath(authStore.role));
 }
 </script>
 

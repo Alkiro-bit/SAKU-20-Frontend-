@@ -37,8 +37,6 @@ function getSelectedItemIds() {
   }
 }
 
-const BMS_PER_ITEM = 1000;
-
 const activeGroup = computed(() => {
   const routeCartId = route.query.cart_id;
   if (routeCartId) {
@@ -50,10 +48,7 @@ const activeGroup = computed(() => {
   return cartStore.cartGroups[0] || null;
 });
 
-const totalItems = computed(() => activeGroup.value?.total_quantity || 0);
 const subtotal = computed(() => activeGroup.value?.subtotal || 0);
-const commission = computed(() => totalItems.value * BMS_PER_ITEM);
-const grandTotal = computed(() => subtotal.value + commission.value);
 
 function formatRupiah(value) {
   return new Intl.NumberFormat('id-ID', {
@@ -115,7 +110,7 @@ async function handleSimulatePaid() {
           <img src="/assets/qris1.png" alt="QRIS payment code" class="qris-image" />
           <div class="payment-total">
             <p>Payment Total</p>
-            <strong>{{ formatRupiah(grandTotal) }}</strong>
+            <strong>{{ formatRupiah(subtotal) }}</strong>
           </div>
         </section>
 
