@@ -21,10 +21,32 @@
 
   /* --- Warna Status Pesanan (mapping ke enum backend) ---
      Figma node 835:226 — badge: bg = warna 20%, border & teks = warna penuh. */
-  --color-status-diproses: #FFD900;         /* "Pending" */
-  --color-status-siap_diambil: #00D707;     /* "Ready" */
+  --color-status-diproses: #FFD900;         /* "Processing" */
+  --color-status-siap_diambil: #00D707;     /* "Ready for Pickup" */
   --color-status-selesai: #969696;          /* "Completed" */
-  --color-status-dibatalkan: #FF0000;       /* "Canceled" */
+  --color-status-dibatalkan: #FF0000;       /* "Cancelled" */
+
+  /* --- Warna Semantic & Aksi Admin --- */
+  --color-success: #00D707;
+  --color-success-dark: #007904;
+  --color-danger: #FF0000;
+  --color-danger-dark: #B42318;
+  --color-warning: #FFD900;
+  --color-warning-dark: #F4C300;
+  --color-admin-bg: #EFEFEF;
+  --color-card-border: #969696;
+
+  /* --- Admin Store Status --- */
+  --color-store-open: var(--color-success);
+  --color-store-open-dark: var(--color-success-dark);
+  --color-store-open-gradient-end: #00DF07;
+  --color-store-open-soft: rgba(0, 215, 7, 0.2);
+  --color-store-closed: var(--color-text-muted);
+  --color-store-closed-soft: rgba(150, 150, 150, 0.2);
+  --color-store-close-action: var(--color-danger);
+  --color-store-close-action-soft: rgba(255, 0, 0, 0.2);
+  --color-store-open-action: var(--color-success);
+  --color-store-open-action-soft: rgba(0, 215, 7, 0.2);
 
   /* --- Latar & Stroke --- */
   --color-background: #FFFFFF;

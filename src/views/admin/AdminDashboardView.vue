@@ -1,114 +1,286 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Icon } from '@iconify/vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { apiClient, getApiErrorMessage } from '@/services/api';
-import StatusBadge from '@/components/common/StatusBadge.vue';
+import { usePolling } from '@/composables/usePolling';
 
 const router = useRouter();
 const authStore = useAuthStore();
 
 const store = ref(null);
 const orders = ref([]);
+const todaySales = ref(0);
+const activeProductsCount = ref(0);
 const loading = ref(true);
-const error = ref('');
+const storeError = ref('');
+const storeToggleError = ref('');
+const productsError = ref('');
+const ordersError = ref('');
+const financeError = ref('');
+const error = computed(() =>
+  [storeError.value, storeToggleError.value, productsError.value, ordersError.value, financeError.value]
+    .filter(Boolean)
+    .join(' '),
+);
 const togglingStore = ref(false);
-const updatingOrderId = ref(null);
+const refreshingLiveData = ref(false);
+const lastUpdatedAt = ref(null);
+const currentTime = ref(new Date());
 const isSidebarCollapsed = ref(false);
+const dashboardDate = computed(() =>
+  new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(currentTime.value),
+);
+const lastUpdatedLabel = computed(() => {
+  if (!lastUpdatedAt.value) return 'Auto-refresh aktif';
+  const seconds = Math.max(0, Math.floor((currentTime.value - lastUpdatedAt.value) / 1000));
+  return `Auto-refresh · updated ${seconds}s ago`;
+});
+function getOrderTimestamp(order) {
+  const timestamp = new Date(order.created_at).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+const displayedOrders = computed(() =>
+  [...orders.value]
+    .sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a))
+    .slice(0, 8)
+    .map((order) => {
+      const status = String(order.status || '').toLowerCase();
+      const statusLabels = {
+        diproses: 'Pending',
+        siap_diambil: 'Ready',
+        selesai: 'Completed',
+        dibatalkan: 'Cancelled',
+      };
+
+      return {
+        id: order.id,
+        queueNumber: order.queue_number ?? '—',
+        name: order.customer_name ?? '—',
+        time: formatOrderTime(order.created_at),
+        price:
+          order.total === undefined || order.total === null ? '—' : formatRupiah(order.total),
+        status: statusLabels[status] || 'Unknown',
+      };
+    }),
+);
 
 // Format Rupiah
 function formatRupiah(val) {
-  if (!val && val !== 0) return 'Rp 0';
-  return 'Rp ' + Number(val).toLocaleString('id-ID');
+  const amount = Number(val);
+  if (!Number.isFinite(amount)) return 'Rp 0';
+  return `Rp ${amount.toLocaleString('id-ID')}`;
 }
 
-// Format Order Time (HH:mm)
-function formatOrderTime(dateStr) {
-  if (!dateStr) return '-';
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '-';
-    return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
-  } catch {
-    return '-';
-  }
+function getJakartaDateKey(date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
-// Customer Name Fallback
-function getCustomerName(order) {
-  return order.customer_name || order.guest_name || order.user?.name || order.name || 'Pelanggan';
+function formatOrderTime(dateString) {
+  if (!dateString) return '—';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
 }
 
 // Stats calculation
-const todaySales = computed(() => {
-  return orders.value
-    .filter((o) => o.status !== 'dibatalkan')
-    .reduce((sum, o) => sum + Number(o.total_price || o.total_amount || o.total || 0), 0);
-});
+const totalOrdersCount = computed(
+  () => orders.value.filter((order) => order.status !== 'dibatalkan').length,
+);
 
-const activeOrdersCount = computed(() => {
-  return orders.value.filter((o) => ['diproses', 'siap_diambil'].includes(o.status)).length;
-});
-
-const completedOrdersCount = computed(() => {
-  return orders.value.filter((o) => o.status === 'selesai').length;
-});
+const completedOrdersCount = computed(
+  () => orders.value.filter((order) => order.status === 'selesai').length,
+);
 
 // Fetch Store Details
 async function fetchStore() {
-  try {
-    const res = await apiClient.get('/admin/store');
-    store.value = res.data.data;
-  } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memuat data toko.');
+  const res = await apiClient.get('/admin/store');
+  const storeData = res.data?.data;
+  if (!storeData || typeof storeData.is_open !== 'boolean') {
+    throw new Error('Respons status toko tidak valid.');
   }
+  store.value = storeData;
 }
 
-// Fetch Orders
-async function fetchOrders() {
-  try {
-    const res = await apiClient.get('/admin/orders', { params: { per_page: 20 } });
-    orders.value = res.data.data || [];
-  } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memuat pesanan.');
-  }
-}
-
-// Toggle Store Open / Close
 async function toggleStore() {
   if (!store.value || togglingStore.value) return;
+
   togglingStore.value = true;
+  storeToggleError.value = '';
+  const nextState = !store.value.is_open;
+
   try {
-    const nextState = !store.value.is_open;
-    await apiClient.patch('/admin/store', { is_open: nextState });
-    store.value.is_open = nextState;
+    const res = await apiClient.patch('/admin/store', { is_open: nextState });
+    const updatedStore = res.data?.data;
+    store.value = {
+      ...store.value,
+      is_open: typeof updatedStore?.is_open === 'boolean' ? updatedStore.is_open : nextState,
+    };
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memperbarui status toko.');
+    storeToggleError.value = getApiErrorMessage(e, 'Gagal memperbarui status toko.');
   } finally {
     togglingStore.value = false;
   }
 }
 
-// Update Order Status
-async function updateOrderStatus(order, newStatus) {
-  if (updatingOrderId.value) return;
-  updatingOrderId.value = order.id;
-  try {
-    await apiClient.patch(`/admin/orders/${order.id}/status`, { status: newStatus });
-    order.status = newStatus;
-  } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memperbarui status pesanan.');
-  } finally {
-    updatingOrderId.value = null;
+async function fetchAllPages(endpoint, params = {}) {
+  const items = [];
+  let page = 1;
+  let firstMeta = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const res = await apiClient.get(endpoint, {
+      params: { ...params, page, per_page: params.per_page || 25 },
+    });
+    const pageItems = res.data?.data;
+    if (!Array.isArray(pageItems)) {
+      throw new Error(`Respons ${endpoint} tidak berisi daftar data yang valid.`);
+    }
+
+    items.push(...pageItems);
+    const meta = res.data?.meta;
+    if (page === 1) firstMeta = meta || null;
+
+    if (Number.isInteger(meta?.current_page) && Number.isInteger(meta?.last_page)) {
+      hasNextPage = meta.current_page < meta.last_page;
+      const nextPage = meta.current_page + 1;
+      if (hasNextPage && nextPage <= page) {
+        throw new Error(`Pagination ${endpoint} tidak maju ke halaman berikutnya.`);
+      }
+      page = nextPage;
+    } else if (res.data?.links && Object.hasOwn(res.data.links, 'next')) {
+      hasNextPage = Boolean(res.data.links.next);
+      page += 1;
+    } else {
+      hasNextPage = false;
+    }
   }
+
+  return { items, meta: firstMeta };
 }
 
-// Refresh Data
+async function fetchOrdersForDate(date) {
+  const { items } = await fetchAllPages('/admin/orders', {
+    from: date,
+    to: date,
+    per_page: 25,
+  });
+  return items;
+}
+
+async function fetchSalesForDate(date) {
+  const res = await apiClient.get('/admin/reports/finance', {
+    params: { from: date, to: date },
+  });
+  const gross = Number(res.data?.data?.gross);
+  if (!Number.isFinite(gross)) {
+    throw new Error('Respons laporan keuangan tidak memiliki data.gross yang valid.');
+  }
+  return gross;
+}
+
+async function fetchActiveProductsCount() {
+  let filtered = null;
+  try {
+    filtered = await fetchAllPages('/admin/products', {
+      is_active: true,
+      per_page: 100,
+    });
+  } catch (e) {
+    const status = e?.response?.status;
+    if (![400, 422].includes(status)) throw e;
+  }
+
+  if (filtered && filtered.items.every((product) => product.is_active === true)) {
+    const rawTotal = filtered.meta?.total;
+    const total = Number(rawTotal);
+    if (rawTotal !== undefined && rawTotal !== null && rawTotal !== '' && Number.isFinite(total)) {
+      return total;
+    }
+  }
+
+  const allProducts = await fetchAllPages('/admin/products', { per_page: 100 });
+  return allProducts.items.filter((product) => product.is_active === true).length;
+}
+
+function errorMessage(reason, fallback) {
+  return reason instanceof Error && !reason.response
+    ? reason.message
+    : getApiErrorMessage(reason, fallback);
+}
+
+async function refreshLiveData() {
+  if (refreshingLiveData.value) return;
+  refreshingLiveData.value = true;
+  const date = getJakartaDateKey(currentTime.value);
+  const [ordersResult, salesResult] = await Promise.allSettled([
+    fetchOrdersForDate(date),
+    fetchSalesForDate(date),
+  ]);
+  const messages = [];
+
+  if (ordersResult.status === 'fulfilled') {
+    orders.value = ordersResult.value;
+    ordersError.value = '';
+  } else {
+    ordersError.value = errorMessage(ordersResult.reason, 'Gagal memuat pesanan.');
+    messages.push(ordersError.value);
+  }
+
+  if (salesResult.status === 'fulfilled') {
+    todaySales.value = salesResult.value;
+    financeError.value = '';
+  } else {
+    financeError.value = errorMessage(salesResult.reason, 'Gagal memuat penjualan hari ini.');
+    messages.push(financeError.value);
+  }
+
+  if (messages.length === 0) lastUpdatedAt.value = new Date();
+  refreshingLiveData.value = false;
+}
+
 async function refreshData() {
+  if ((loading.value && store.value) || refreshingLiveData.value) return;
   loading.value = true;
-  error.value = '';
-  await Promise.all([fetchStore(), fetchOrders()]);
+  storeError.value = '';
+  productsError.value = '';
+  const [storeResult, productsResult] = await Promise.allSettled([
+    fetchStore(),
+    fetchActiveProductsCount(),
+  ]);
+
+  if (storeResult.status === 'rejected') {
+    storeError.value = errorMessage(storeResult.reason, 'Gagal memuat status toko.');
+  }
+  if (productsResult.status === 'fulfilled') {
+    activeProductsCount.value = productsResult.value;
+    productsError.value = '';
+  } else {
+    productsError.value = errorMessage(productsResult.reason, 'Gagal memuat produk aktif.');
+  }
+
+  await refreshLiveData();
   loading.value = false;
 }
 
@@ -122,8 +294,23 @@ function toggleSidebar() {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
 }
 
+const polling = usePolling(refreshLiveData, 5000, {
+  pauseWhenHidden: true,
+  runImmediately: false,
+});
+
+let clockTimer = null;
+
 onMounted(async () => {
+  clockTimer = setInterval(() => {
+    currentTime.value = new Date();
+  }, 1000);
   await refreshData();
+  polling.start();
+});
+
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer);
 });
 </script>
 
@@ -194,7 +381,7 @@ onMounted(async () => {
             <Icon icon="entypo:shop" width="30" height="30" class="shop-icon" />
             <div class="shop-meta">
               <span class="shop-name">{{ store?.name || 'JungleFood' }}</span>
-              <span v-if="store?.type" class="store-type-badge">{{ store.type }}</span>
+              <span v-if="store?.store_type" class="store-type-badge">{{ store.store_type }}</span>
             </div>
           </div>
         </div>
@@ -204,14 +391,14 @@ onMounted(async () => {
             type="button"
             class="refresh-btn"
             title="Refresh Data"
-            :disabled="loading"
+            :disabled="loading || refreshingLiveData || togglingStore"
             @click="refreshData"
           >
             <Icon
               icon="mdi:refresh"
               width="20"
               height="20"
-              :class="{ 'spin-icon': loading }"
+              :class="{ 'spin-icon': loading || refreshingLiveData }"
             />
             <span class="refresh-label">Refresh</span>
           </button>
@@ -223,217 +410,195 @@ onMounted(async () => {
 
       <!-- Main Content -->
       <main class="dashboard-content">
-        <!-- Error Banner -->
         <div v-if="error" class="error-banner" role="alert">
           <Icon icon="mdi:alert-circle-outline" width="20" height="20" />
           <span>{{ error }}</span>
           <button type="button" class="retry-btn" @click="refreshData">Coba Lagi</button>
         </div>
 
-        <!-- Page Title -->
-        <div class="page-title-row">
-          <h1 class="page-title">Dashboard</h1>
-        </div>
-
-        <!-- Loading State Skeleton -->
-        <div v-if="loading" class="loading-state">
-          <div class="stats-grid skeleton-grid">
-            <div class="skeleton-card" v-for="i in 3" :key="i"></div>
+        <section class="dashboard-summary" aria-labelledby="dashboard-title" :aria-busy="loading">
+          <div class="summary-heading">
+            <h1 id="dashboard-title" class="summary-title">Dashboard</h1>
+            <p class="summary-date">{{ dashboardDate }}</p>
           </div>
-          <div class="dashboard-grid">
-            <div class="skeleton-card large"></div>
-            <div class="skeleton-card side"></div>
-          </div>
-        </div>
 
-        <template v-else>
-          <!-- Stats Cards -->
-          <section class="stats-grid">
-            <!-- Sales Today -->
-            <div class="stat-card">
-              <div class="stat-card-header">
-                <Icon
-                  icon="ant-design:wallet-filled"
-                  class="stat-icon sales-icon"
-                  width="16"
-                  height="16"
-                />
-                <span class="stat-title sales-title">Sales Today:</span>
+          <div v-if="loading" class="summary-stats summary-stats-loading" aria-hidden="true">
+            <div v-for="index in 4" :key="index" class="summary-skeleton"></div>
+          </div>
+
+          <div v-else class="summary-stats" role="group" aria-label="Ringkasan toko">
+            <article class="summary-stat-card">
+              <div class="summary-stat-header">
+                <Icon icon="ant-design:wallet-filled" width="16" height="16" aria-hidden="true" />
+                <span>Sales Today:</span>
               </div>
-              <div class="stat-card-value">
-                <span class="stat-number">{{ formatRupiah(todaySales) }}</span>
+              <div class="summary-stat-value">
+                <span class="summary-stat-number">{{ formatRupiah(todaySales) }}</span>
               </div>
+            </article>
+
+            <article class="summary-stat-card">
+              <div class="summary-stat-header">
+                <Icon icon="fontisto:checkbox-active" width="18" height="16" aria-hidden="true" />
+                <span>Active Products:</span>
+              </div>
+              <div class="summary-stat-value">
+                <span class="summary-stat-number">{{ activeProductsCount }}</span>
+                <span class="summary-stat-caption">Products</span>
+              </div>
+            </article>
+
+            <article class="summary-stat-card">
+              <div class="summary-stat-header">
+                <Icon icon="bi:bag-fill" width="16" height="16" aria-hidden="true" />
+                <span>Orders:</span>
+              </div>
+              <div class="summary-stat-value">
+                <span class="summary-stat-number">{{ totalOrdersCount }}</span>
+                <span class="summary-stat-caption">Orders</span>
+              </div>
+            </article>
+
+            <article class="summary-stat-card">
+              <div class="summary-stat-header">
+                <Icon icon="bi:cart-check-fill" width="16" height="16" aria-hidden="true" />
+                <span>Completed</span>
+              </div>
+              <div class="summary-stat-value">
+                <span class="summary-stat-number">{{ completedOrdersCount }}</span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <div class="dashboard-lower-grid">
+          <section class="orders-section" aria-labelledby="current-orders-title">
+            <div class="section-header">
+              <div class="title-meta">
+                <h2 id="current-orders-title" class="section-title">Current Orders</h2>
+                <p class="section-subtitle">Orders that need to be processed immediately</p>
+                <p class="last-updated" role="status">{{ lastUpdatedLabel }}</p>
+              </div>
+              <router-link to="/admin/orders" class="see-all-link">
+                <span>See All</span>
+                <Icon icon="akar-icons:arrow-up-right" width="20" height="20" aria-hidden="true" />
+              </router-link>
             </div>
 
-            <!-- Orders -->
-            <div class="stat-card">
-              <div class="stat-card-header">
-                <Icon
-                  icon="bi:bag-fill"
-                  class="stat-icon orders-icon"
-                  width="16"
-                  height="16"
-                />
-                <span class="stat-title orders-title">Orders:</span>
-              </div>
-              <div class="stat-card-value">
-                <span class="stat-number">{{ activeOrdersCount }}</span>
-              </div>
-            </div>
-
-            <!-- Completed -->
-            <div class="stat-card">
-              <div class="stat-card-header">
-                <Icon
-                  icon="bi:cart-check-fill"
-                  class="stat-icon completed-icon"
-                  width="16"
-                  height="16"
-                />
-                <span class="stat-title completed-title">Completed</span>
-              </div>
-              <div class="stat-card-value">
-                <span class="stat-number">{{ completedOrdersCount }}</span>
-              </div>
+            <div class="table-container">
+              <table class="orders-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Queue Number</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Time of Order</th>
+                    <th scope="col">Order Price</th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="loading">
+                    <td colspan="5" class="orders-table-message">Loading orders...</td>
+                  </tr>
+                  <tr v-else-if="displayedOrders.length === 0">
+                    <td colspan="5" class="orders-table-message">No orders today.</td>
+                  </tr>
+                  <tr v-for="order in displayedOrders" :key="order.id">
+                    <td class="queue-number">{{ order.queueNumber }}</td>
+                    <td>{{ order.name }}</td>
+                    <td>{{ order.time }}</td>
+                    <td>{{ order.price }}</td>
+                    <td>
+                      <span
+                        class="order-status"
+                        :class="`order-status--${order.status.toLowerCase()}`"
+                      >
+                        {{ order.status }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </section>
 
-          <!-- Content Split: Current Orders & Store Status -->
-          <div class="dashboard-grid">
-            <!-- Current Orders Column -->
-            <section class="orders-section">
-              <div class="section-header">
-                <div class="title-meta">
-                  <h2 class="section-title">Current Orders</h2>
-                  <p class="section-subtitle">Orders that need to be processed immediately</p>
-                </div>
-                <router-link to="/admin/orders" class="see-all-link">
-                  <span>See All</span>
-                  <Icon icon="akar-icons:arrow-up-right" width="16" height="16" />
-                </router-link>
-              </div>
-
-              <!-- Table or Empty State -->
-              <div v-if="orders.length === 0" class="empty-state">
-                <Icon icon="bi:inbox" width="48" height="48" class="empty-icon" />
-                <p class="empty-text">Belum ada pesanan saat ini.</p>
-              </div>
-
-              <div v-else class="table-container">
-                <table class="orders-table">
-                  <thead>
-                    <tr>
-                      <th class="th-name">Name</th>
-                      <th class="th-queue">Queue Number</th>
-                      <th class="th-time">Time of Order</th>
-                      <th class="th-price">Order Price</th>
-                      <th class="th-status">Status</th>
-                      <th class="th-actions">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="order in orders" :key="order.id" class="order-row">
-                      <td class="td-name">
-                        <div class="name-cell">
-                          <span>{{ getCustomerName(order) }}</span>
-                          <span
-                            v-if="order.seller_note"
-                            class="seller-note-badge"
-                            :title="order.seller_note"
-                          >
-                            <Icon icon="mdi:note-text-outline" width="12" height="12" />
-                            Note
-                          </span>
-                        </div>
-                      </td>
-                      <td class="td-queue">
-                        <span class="queue-pill">#{{ order.queue_number }}</span>
-                      </td>
-                      <td class="td-time">{{ formatOrderTime(order.created_at) }}</td>
-                      <td class="td-price">
-                        {{ formatRupiah(order.total_price || order.total_amount || order.total) }}
-                      </td>
-                      <td class="td-status">
-                        <StatusBadge :status="order.status" />
-                      </td>
-                      <td class="td-actions">
-                        <div class="actions-group">
-                          <button
-                            v-if="order.status === 'diproses'"
-                            type="button"
-                            class="action-btn btn-ready"
-                            :disabled="updatingOrderId === order.id"
-                            @click="updateOrderStatus(order, 'siap_diambil')"
-                          >
-                            Siap
-                          </button>
-                          <button
-                            v-if="order.status === 'diproses'"
-                            type="button"
-                            class="action-btn btn-cancel"
-                            :disabled="updatingOrderId === order.id"
-                            @click="updateOrderStatus(order, 'dibatalkan')"
-                          >
-                            Batal
-                          </button>
-                          <button
-                            v-if="order.status === 'siap_diambil'"
-                            type="button"
-                            class="action-btn btn-done"
-                            :disabled="updatingOrderId === order.id"
-                            @click="updateOrderStatus(order, 'selesai')"
-                          >
-                            Selesai
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <!-- Store Status Column -->
-            <section class="store-status-section">
+          <section class="store-status-section" aria-labelledby="store-status-title">
+            <div class="store-status-main">
               <div class="store-status-header">
                 <div class="title-meta">
-                  <h2 class="section-title">Store Status</h2>
+                  <h2 id="store-status-title" class="section-title">Store Status</h2>
                   <p class="section-subtitle">Today’s operations</p>
                 </div>
-                <!-- Switch Toggle -->
                 <button
                   type="button"
                   class="switch-control"
-                  :class="{ 'is-active': store?.is_open }"
-                  :disabled="togglingStore"
-                  @click="toggleStore"
-                  title="Toggle status toko"
+                  :class="store?.is_open ? 'is-active' : 'is-inactive'"
+                  :disabled="!store || togglingStore || loading"
+                  :aria-checked="store?.is_open === true"
+                  :aria-label="
+                    store
+                      ? store.is_open
+                        ? 'Close store'
+                        : 'Open store'
+                      : loading
+                        ? 'Loading store status'
+                        : 'Store status unavailable'
+                  "
+                  :aria-busy="togglingStore"
                   role="switch"
-                  :aria-checked="store?.is_open"
+                  @click="toggleStore"
                 >
                   <span class="switch-handle"></span>
                 </button>
               </div>
 
-              <!-- Status Banner -->
               <div
                 class="status-banner"
-                :class="store?.is_open ? 'banner-open' : 'banner-closed'"
+                :class="
+                  store
+                    ? store.is_open
+                      ? 'banner-open'
+                      : 'banner-closed'
+                    : loading
+                      ? 'banner-loading'
+                      : 'banner-unavailable'
+                "
+                role="status"
+                aria-live="polite"
               >
                 <div class="banner-text">
-                  <h3 class="banner-title">{{ store?.is_open ? 'Open' : 'Closed' }}</h3>
+                  <h3 class="banner-title">
+                    {{
+                      store
+                        ? store.is_open
+                          ? 'Open'
+                          : 'Closed'
+                        : loading
+                          ? 'Loading...'
+                          : 'Unavailable'
+                    }}
+                  </h3>
                   <p class="banner-desc">
                     {{
-                      store?.is_open
-                        ? 'Your store is currently accepting orders'
-                        : 'Your store is currently closed for orders'
+                      store
+                        ? store.is_open
+                          ? 'Your store is currently accepting orders'
+                          : 'Your store is currently closed for orders'
+                        : loading
+                          ? 'Loading store status...'
+                          : 'Store status could not be loaded'
                     }}
                   </p>
                 </div>
-                <Icon icon="entypo:shop" width="30" height="30" class="banner-icon" />
+                <Icon
+                  icon="entypo:shop"
+                  width="30"
+                  height="30"
+                  class="banner-icon"
+                  aria-hidden="true"
+                />
               </div>
 
-              <!-- Content details -->
               <div class="store-info-list">
                 <div class="info-row">
                   <span class="info-label">Operating Hours</span>
@@ -443,27 +608,55 @@ onMounted(async () => {
                   <span class="info-label">New Orders</span>
                   <span
                     class="status-indicator-badge"
-                    :class="store?.is_open ? 'badge-enabled' : 'badge-disabled'"
+                    :class="
+                      store
+                        ? store.is_open
+                          ? 'badge-enabled'
+                          : 'badge-disabled'
+                        : 'badge-unavailable'
+                    "
                   >
-                    {{ store?.is_open ? 'Enabled' : 'Disabled' }}
+                    {{
+                      store
+                        ? store.is_open
+                          ? 'Enabled'
+                          : 'Disabled'
+                        : loading
+                          ? 'Loading'
+                          : 'Unavailable'
+                    }}
                   </span>
                 </div>
               </div>
+            </div>
 
-              <!-- Toggle CTA Button -->
-              <button
-                type="button"
-                class="store-action-btn"
-                :class="store?.is_open ? 'btn-close-store' : 'btn-open-store'"
-                :disabled="togglingStore"
-                @click="toggleStore"
-              >
-                <span v-if="togglingStore">Memproses...</span>
-                <span v-else>{{ store?.is_open ? 'Close Store' : 'Open Store' }}</span>
-              </button>
-            </section>
-          </div>
-        </template>
+            <button
+              type="button"
+              class="store-action-btn"
+              :class="
+                store
+                  ? store.is_open
+                    ? 'btn-close-store'
+                    : 'btn-open-store'
+                  : 'btn-store-unavailable'
+              "
+              :disabled="!store || togglingStore || loading"
+              @click="toggleStore"
+              :aria-busy="togglingStore"
+            >
+              <span v-if="togglingStore">Memproses...</span>
+              <span v-else>{{
+                store
+                  ? store.is_open
+                    ? 'Close Store'
+                    : 'Open Store'
+                  : loading
+                    ? 'Memuat status toko...'
+                    : 'Status toko tidak tersedia'
+              }}</span>
+            </button>
+          </section>
+        </div>
       </main>
     </div>
   </div>
@@ -510,7 +703,7 @@ onMounted(async () => {
 }
 
 .sidebar-toggle-btn {
-  color: #008cff;
+  color: #969696;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -757,93 +950,130 @@ onMounted(async () => {
   text-decoration: underline;
 }
 
-.page-title-row {
+.dashboard-summary {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 30px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, #003a6a 0%, #008cff 100%);
+  box-shadow: 0 4px 5px rgba(0, 0, 0, 0.25);
 }
 
-.page-title {
-  font-family: var(--font-family-base);
-  font-weight: 600;
-  font-size: 32px;
-  color: #000000;
-}
-
-/* Stats Cards Grid */
-.stats-grid {
+.summary-heading {
   display: flex;
-  gap: 30px;
+  flex-direction: column;
+  justify-content: center;
   width: 100%;
 }
 
-.stat-card {
-  flex: 1;
-  min-width: 0;
-  background-color: #ffffff;
-  border: 0.5px solid #969696;
-  border-radius: 6px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.summary-title {
+  color: var(--color-text-on-accent);
+  font-family: var(--font-family-base);
+  font-size: 40px;
+  font-weight: 600;
+  line-height: normal;
 }
 
-.stat-card-header {
+.summary-date {
+  color: var(--color-text-muted);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-xs);
+  line-height: normal;
+}
+
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 30px;
+  width: 100%;
+  padding: 10px 0;
+}
+
+.summary-stat-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+}
+
+.summary-stat-header {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.stat-title {
-  font-family: var(--font-family-brand);
-  font-weight: var(--font-weight-regular);
-  font-size: 16px;
-}
-
-.sales-title,
-.sales-icon {
-  color: #f4c300;
-}
-
-.orders-title,
-.orders-icon {
-  color: #00df07;
-}
-
-.completed-title,
-.completed-icon {
   color: #008cff;
-}
-
-.stat-card-value {
-  padding-left: 26px;
-}
-
-.stat-number {
   font-family: var(--font-family-brand);
-  font-weight: var(--font-weight-medium);
+  font-size: 16px;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.summary-stat-header :deep(svg) {
+  flex: 0 0 auto;
+}
+
+.summary-stat-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0 10px;
+}
+
+.summary-stat-number {
+  color: var(--color-text);
+  font-family: var(--font-family-brand);
   font-size: 24px;
-  color: #000000;
+  font-weight: var(--font-weight-medium);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.summary-stat-caption {
+  color: var(--color-text-muted);
+  font-family: var(--font-family-brand);
+  font-size: 10px;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.summary-stats-loading {
+  align-items: stretch;
+}
+
+.summary-skeleton {
+  min-height: 76px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, #e5e5e5 25%, #f0f0f0 50%, #e5e5e5 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
 
 /* Content Grid (2 Columns) */
-.dashboard-grid {
-  display: flex;
+.dashboard-lower-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 350px);
   gap: 20px;
   width: 100%;
-  align-items: flex-start;
+  align-items: start;
 }
 
 /* Orders Section */
 .orders-section {
-  flex: 1;
   min-width: 0;
   background-color: #ffffff;
-  border-radius: 6px;
-  padding: 20px 40px;
+  border-radius: var(--radius-md);
+  padding: 10px 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .section-header {
@@ -873,6 +1103,13 @@ onMounted(async () => {
   color: #969696;
 }
 
+.last-updated {
+  margin-top: 4px;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-base);
+  font-size: 10px;
+}
+
 .see-all-link {
   display: flex;
   align-items: center;
@@ -897,28 +1134,109 @@ onMounted(async () => {
 }
 
 .orders-table {
+  --orders-grid-columns: minmax(80px, 0.85fr) minmax(120px, 1.25fr) minmax(120px, 1.15fr) minmax(110px, 1.15fr) minmax(90px, 0.9fr);
+  display: grid;
+  grid-template-columns: var(--orders-grid-columns);
+  align-content: start;
   width: 100%;
-  border-collapse: collapse;
+  min-width: 670px;
+  min-height: 300px;
   text-align: center;
+}
+
+.orders-table thead,
+.orders-table tbody {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: var(--orders-grid-columns);
+}
+
+.orders-table tbody {
+  align-content: start;
+}
+
+.orders-table tr {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: var(--orders-grid-columns);
+  align-items: center;
+  width: 100%;
 }
 
 .orders-table th {
   border-bottom: 0.5px solid #969696;
-  padding: 8px 12px;
+  padding: 4px 8px;
   font-family: var(--font-family-base);
-  font-weight: 600;
+  font-weight: var(--font-weight-bold);
   font-size: 10px;
   color: #969696;
   white-space: nowrap;
 }
 
+.orders-table thead {
+  height: 30px;
+}
+
 .orders-table td {
-  padding: 12px;
+  padding: 4px 8px;
   font-family: var(--font-family-base);
   font-weight: var(--font-weight-medium);
   font-size: 12px;
   color: #000000;
   vertical-align: middle;
+}
+
+.orders-table-message {
+  grid-column: 1 / -1;
+  color: var(--color-text-muted) !important;
+}
+
+.orders-table tbody tr {
+  height: 54px;
+}
+
+.orders-table .queue-number {
+  color: #008cff;
+}
+
+.order-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 4px 10px;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  font-family: var(--font-family-brand);
+  font-size: 8px;
+  font-weight: var(--font-weight-medium);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.order-status--pending {
+  color: #ffd900;
+  background-color: rgba(255, 217, 0, 0.2);
+}
+
+.order-status--ready {
+  color: #00d707;
+  background-color: rgba(0, 215, 7, 0.2);
+}
+
+.order-status--completed {
+  color: #969696;
+  background-color: rgba(150, 150, 150, 0.2);
+}
+
+.order-status--cancelled {
+  color: var(--color-status-dibatalkan);
+  background-color: rgba(255, 0, 0, 0.2);
+}
+
+.order-status--unknown {
+  color: var(--color-text-muted);
+  background-color: var(--color-admin-bg);
 }
 
 .name-cell {
@@ -1015,38 +1333,50 @@ onMounted(async () => {
   font-size: var(--font-size-sm);
 }
 
-/* Store Status Section */
 .store-status-section {
-  width: 350px;
-  flex-shrink: 0;
+  min-width: 0;
   background-color: #ffffff;
-  border-radius: 6px;
-  padding: 20px;
+  border-radius: var(--radius-md);
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  justify-content: space-between;
+  gap: 30px;
+}
+
+.store-status-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .store-status-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 10px;
 }
 
-/* Switch control */
 .switch-control {
-  width: 44px;
-  height: 24px;
-  background-color: #d1d5db;
-  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  width: 42px;
+  height: 22px;
+  flex: 0 0 auto;
+  padding: 1px;
+  background-color: var(--color-store-closed);
+  border-radius: 11px;
   position: relative;
   cursor: pointer;
   transition: background-color var(--transition-fast);
-  padding: 2px;
 }
 
 .switch-control.is-active {
-  background-color: #00d707;
+  background-color: var(--color-store-open);
+}
+
+.switch-control.is-inactive {
+  background-color: var(--color-store-closed);
 }
 
 .switch-control:disabled {
@@ -1054,10 +1384,17 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 
+.switch-control:focus-visible,
+.store-action-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
 .switch-handle {
   display: block;
   width: 20px;
   height: 20px;
+  flex: 0 0 20px;
   background-color: #ffffff;
   border-radius: 50%;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
@@ -1068,10 +1405,10 @@ onMounted(async () => {
   transform: translateX(20px);
 }
 
-/* Status Banner */
 .status-banner {
   padding: 20px;
-  border-radius: 6px;
+  min-height: 83px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1079,11 +1416,25 @@ onMounted(async () => {
 }
 
 .banner-open {
-  background: linear-gradient(90deg, #007904 0%, #00df07 100%);
+  background: linear-gradient(
+    90deg,
+    var(--color-store-open-dark) 0%,
+    var(--color-store-open-gradient-end) 100%
+  );
 }
 
 .banner-closed {
-  background: linear-gradient(90deg, #b42318 0%, #ff4d4f 100%);
+  background-color: var(--color-store-closed);
+}
+
+.banner-unavailable {
+  background-color: var(--color-admin-bg);
+  color: var(--color-text);
+}
+
+.banner-loading {
+  background-color: var(--color-admin-bg);
+  color: var(--color-text-muted);
 }
 
 .banner-text {
@@ -1103,6 +1454,7 @@ onMounted(async () => {
   font-weight: var(--font-weight-medium);
   font-size: 10px;
   opacity: 0.95;
+  white-space: normal;
 }
 
 .banner-icon {
@@ -1114,7 +1466,7 @@ onMounted(async () => {
 .store-info-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .info-row {
@@ -1122,7 +1474,8 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   font-size: 14px;
-  padding: 0 4px;
+  gap: 8px;
+  padding: 0 10px;
 }
 
 .info-label {
@@ -1138,36 +1491,48 @@ onMounted(async () => {
 }
 
 .status-indicator-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 4px 10px;
   border-radius: 10px;
   font-family: var(--font-family-brand);
   font-weight: var(--font-weight-medium);
   font-size: 8px;
   border: 1px solid transparent;
+  white-space: nowrap;
 }
 
 .badge-enabled {
-  background-color: rgba(0, 215, 7, 0.2);
-  border-color: #00d707;
-  color: #007904;
+  background-color: var(--color-store-open-soft);
+  border-color: var(--color-store-open);
+  color: var(--color-store-open-dark);
 }
 
 .badge-disabled {
-  background-color: rgba(255, 0, 0, 0.2);
-  border-color: red;
-  color: red;
+  background-color: var(--color-store-closed-soft);
+  border-color: var(--color-store-closed);
+  color: var(--color-store-closed);
 }
 
-/* Store Action CTA */
+.badge-unavailable {
+  background-color: var(--color-admin-bg);
+  border-color: var(--color-card-border);
+  color: var(--color-text-muted);
+}
+
 .store-action-btn {
   width: 100%;
   padding: 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-family: var(--font-family-brand);
   font-weight: var(--font-weight-medium);
   font-size: 14px;
   text-align: center;
-  transition: all var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 .store-action-btn:disabled {
@@ -1176,23 +1541,29 @@ onMounted(async () => {
 }
 
 .btn-close-store {
-  background-color: rgba(255, 0, 0, 0.15);
-  border: 1px solid red;
-  color: red;
+  background-color: var(--color-store-close-action-soft);
+  border: 1px solid var(--color-store-close-action);
+  color: var(--color-store-close-action);
 }
 
 .btn-close-store:hover:not(:disabled) {
-  background-color: rgba(255, 0, 0, 0.25);
+  background-color: color-mix(in srgb, var(--color-store-close-action) 30%, transparent);
 }
 
 .btn-open-store {
-  background-color: rgba(0, 215, 7, 0.15);
-  border: 1px solid #00d707;
-  color: #007904;
+  background-color: var(--color-store-open-action-soft);
+  border: 1px solid var(--color-store-open-action);
+  color: var(--color-store-open-dark);
 }
 
 .btn-open-store:hover:not(:disabled) {
-  background-color: rgba(0, 215, 7, 0.25);
+  background-color: color-mix(in srgb, var(--color-store-open-action) 30%, transparent);
+}
+
+.btn-store-unavailable {
+  background-color: var(--color-admin-bg);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-text-muted);
 }
 
 /* Skeleton Loading State */
@@ -1233,12 +1604,13 @@ onMounted(async () => {
 
 /* Responsive: Tablet Breakpoints (<= 1024px) */
 @media (max-width: 1024px) {
-  .dashboard-grid {
-    flex-direction: column;
+  .dashboard-lower-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .store-status-section {
-    width: 100%;
+  .summary-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
   }
 
   .admin-topbar {
@@ -1277,6 +1649,14 @@ onMounted(async () => {
     display: inline-flex;
   }
 
+  .dashboard-summary {
+    padding: 20px;
+  }
+
+  .summary-stats {
+    gap: 14px;
+  }
+
   .stats-grid {
     flex-direction: column;
     gap: 14px;
@@ -1293,6 +1673,20 @@ onMounted(async () => {
 
   .dashboard-content {
     padding: 16px;
+  }
+
+  .orders-section {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-title {
+    font-size: 32px;
+  }
+
+  .summary-stats {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

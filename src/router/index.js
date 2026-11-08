@@ -10,6 +10,9 @@ import OrderTrackingView from '@/views/public/OrderTrackingView.vue';
 import LoginView from '@/views/auth/LoginView.vue';
 import RegisterView from '@/views/auth/RegisterView.vue';
 import AdminDashboardView from '@/views/admin/AdminDashboardView.vue';
+import AdminOrdersView from '@/views/admin/AdminOrdersView.vue';
+import AdminProductsView from '@/views/admin/AdminProductsView.vue';
+import AdminReportsView from '@/views/admin/AdminReportsView.vue';
 import SuperadminDashboardView from '@/views/superadmin/SuperadminDashboardView.vue';
 
 const routes = [
@@ -67,6 +70,24 @@ const routes = [
     path: '/admin/dashboard',
     name: 'admin-dashboard',
     component: AdminDashboardView,
+    meta: { requiresAuth: true, role: 'admin' },
+  },
+  {
+    path: '/admin/orders',
+    name: 'admin-orders',
+    component: AdminOrdersView,
+    meta: { requiresAuth: true, role: 'admin' },
+  },
+  {
+    path: '/admin/products',
+    name: 'admin-products',
+    component: AdminProductsView,
+    meta: { requiresAuth: true, role: 'admin' },
+  },
+  {
+    path: '/admin/reports',
+    name: 'admin-reports',
+    component: AdminReportsView,
     meta: { requiresAuth: true, role: 'admin' },
   },
   {

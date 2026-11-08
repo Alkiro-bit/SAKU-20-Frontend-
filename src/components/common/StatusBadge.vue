@@ -9,14 +9,16 @@ const props = defineProps({
 });
 
 const statusConfig = {
-  diproses: { label: 'Pending', color: 'var(--color-status-diproses)' },
-  pending: { label: 'Pending', color: 'var(--color-status-diproses)' },
-  siap_diambil: { label: 'Ready', color: 'var(--color-status-siap_diambil)' },
-  ready: { label: 'Ready', color: 'var(--color-status-siap_diambil)' },
+  diproses: { label: 'Processing', color: 'var(--color-status-diproses)' },
+  processing: { label: 'Processing', color: 'var(--color-status-diproses)' },
+  pending: { label: 'Processing', color: 'var(--color-status-diproses)' },
+  siap_diambil: { label: 'Ready for Pickup', color: 'var(--color-status-siap_diambil)' },
+  ready: { label: 'Ready for Pickup', color: 'var(--color-status-siap_diambil)' },
   selesai: { label: 'Completed', color: 'var(--color-status-selesai)' },
   completed: { label: 'Completed', color: 'var(--color-status-selesai)' },
-  dibatalkan: { label: 'Canceled', color: 'var(--color-status-dibatalkan)' },
-  canceled: { label: 'Canceled', color: 'var(--color-status-dibatalkan)' },
+  dibatalkan: { label: 'Cancelled', color: 'var(--color-status-dibatalkan)' },
+  cancelled: { label: 'Cancelled', color: 'var(--color-status-dibatalkan)' },
+  canceled: { label: 'Cancelled', color: 'var(--color-status-dibatalkan)' },
 };
 
 const current = computed(() => {
