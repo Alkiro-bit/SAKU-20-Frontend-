@@ -5,6 +5,7 @@ import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import StoreCard from '@/components/modules/StoreCard.vue';
 import ProductCard from '@/components/modules/ProductCard.vue';
+import ClosedStoreEmptyState from '@/components/common/ClosedStoreEmptyState.vue';
 import { getStores, getStoreProductsPage, getApiErrorMessage } from '@/services/api';
 
 const searchQuery = ref('');
@@ -20,13 +21,25 @@ const loadMoreTarget = ref(null);
 let observer;
 
 const storeFilters = computed(() => [{ id: null, name: 'All' }, ...storesList.value]);
+const selectedStore = computed(() => storesList.value.find((s) => s.id === selectedStoreId.value));
+const isSelectedStoreClosed = computed(() => selectedStore.value && selectedStore.value.is_open === false);
+const closedStoreIds = computed(() => new Set(storesList.value.filter((s) => s.is_open === false).map((s) => s.id)));
+const areAllStoresClosed = computed(() => storesList.value.length > 0 && storesList.value.every((s) => s.is_open === false));
+
 const allProducts = computed(() => rawProducts.value);
-const newestProducts = computed(() => rawProducts.value.slice(0, 6));
+const newestProducts = computed(() => {
+  if (isSelectedStoreClosed.value) return [];
+  return rawProducts.value
+    .filter((p) => !closedStoreIds.value.has(p.store_id ?? p.storeId))
+    .slice(0, 6);
+});
 
 const filteredProducts = computed(() => {
+  if (isSelectedStoreClosed.value) return [];
   const q = searchQuery.value.trim().toLowerCase();
   return allProducts.value.filter((p) => {
     const storeId = p.store_id ?? p.storeId;
+    if (closedStoreIds.value.has(storeId)) return false;
     const matchStore = selectedStoreId.value === null || storeId === selectedStoreId.value;
     const matchQuery = !q || p.name.toLowerCase().includes(q);
     return matchStore && matchQuery;
@@ -38,12 +51,30 @@ let nextPage = 1;
 
 async function loadProducts(storeId = null, append = false) {
   if (loadingMore.value) return;
+  const targetStore = storeId ? storesList.value.find((s) => s.id === storeId) : null;
+  if (targetStore && targetStore.is_open === false) {
+    rawProducts.value = [];
+    hasMore.value = false;
+    loading.value = false;
+    loadingMore.value = false;
+    return;
+  }
+
   const currentRequest = ++requestId;
   loading.value = !append;
   loadingMore.value = append;
   error.value = '';
   try {
-    const stores = storeId ? [{ id: storeId }] : storesList.value;
+    const stores = storeId
+      ? [{ id: storeId }]
+      : storesList.value.filter((s) => s.is_open !== false);
+
+    if (stores.length === 0) {
+      rawProducts.value = [];
+      hasMore.value = false;
+      return;
+    }
+
     const results = await Promise.allSettled(
       stores.map((store) => getStoreProductsPage(store.id, { page: append ? nextPage : 1 })),
     );
@@ -140,37 +171,50 @@ onBeforeUnmount(() => observer?.disconnect());
         </div>
       </section>
 
-      <!-- Newest Section -->
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">Newest</h2>
-        </div>
-        <div class="carousel-track">
-          <ProductCard
-            v-for="item in newestProducts"
-            :key="'newest-' + item.id"
-            :product="item"
-            compact
+      <!-- Closed Store Empty State -->
+      <ClosedStoreEmptyState
+        v-if="isSelectedStoreClosed || (selectedStoreId === null && areAllStoresClosed)"
+        :title="selectedStore ? `${selectedStore.name} is Closed` : 'All Stores are Closed'"
+        message="The food never stops, come back again when it opens."
+      />
+
+      <template v-else>
+        <!-- Newest Section -->
+        <section v-if="newestProducts.length > 0" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Newest</h2>
+          </div>
+          <div class="carousel-track">
+            <ProductCard
+              v-for="item in newestProducts"
+              :key="'newest-' + item.id"
+              :product="item"
+              compact
+            />
+          </div>
+        </section>
+        
+        <!-- All Products Section -->
+        <section class="section">
+          <div class="section-header">
+            <h2 class="section-title">All Products</h2>
+          </div>
+          <div v-if="filteredProducts.length > 0" class="product-grid">
+            <ProductCard
+              v-for="item in filteredProducts"
+              :key="'all-' + item.id"
+              :product="item"
+            />
+          </div>
+          <ClosedStoreEmptyState
+            v-else-if="!loading && !loadingMore && rawProducts.length === 0"
+            message="The food never stops, come back again when it opens."
           />
-        </div>
-      </section>
-      
-      <!-- All Products Section -->
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">All Products</h2>
-        </div>
-        <div class="product-grid">
-          <ProductCard
-            v-for="item in filteredProducts"
-            :key="'all-' + item.id"
-            :product="item"
-          />
-        </div>
-        <p v-if="loadingMore" class="load-status" aria-live="polite">Memuat produk...</p>
-        <p v-else-if="error" class="load-status error" role="alert">{{ error }}</p>
-        <div ref="loadMoreTarget" class="load-more-target" aria-hidden="true" />
-      </section>
+          <p v-if="loadingMore" class="load-status" aria-live="polite">Memuat produk...</p>
+          <p v-else-if="error" class="load-status error" role="alert">{{ error }}</p>
+          <div ref="loadMoreTarget" class="load-more-target" aria-hidden="true" />
+        </section>
+      </template>
 
     </main>
 

@@ -14,7 +14,8 @@ onMounted(async () => {
   try {
     const stores = await getStores({ type: 'siswa' });
     if (stores && stores.length) {
-      const results = await Promise.allSettled(stores.map((s) => getStoreProducts(s.id)));
+      const openStores = stores.filter((s) => s.is_open !== false);
+      const results = await Promise.allSettled(openStores.map((s) => getStoreProducts(s.id)));
       const items = [];
       results.forEach((res) => {
         if (res.status === 'fulfilled' && Array.isArray(res.value)) {

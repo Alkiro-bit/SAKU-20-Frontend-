@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue';
 import MobileHeader from '@/components/layout/MobileHeader.vue';
 import BottomNav from '@/components/layout/BottomNav.vue';
 import ProductCard from '@/components/modules/ProductCard.vue';
+import ClosedStoreEmptyState from '@/components/common/ClosedStoreEmptyState.vue';
 import { getStores, getStoreProductsPage } from '@/services/api';
 
 const searchQuery = ref('');
@@ -12,9 +13,12 @@ const apiProducts = ref([]);
 const loadingMore = ref(false);
 const hasMore = ref(false);
 const loadMoreTarget = ref(null);
+const tefaStore = ref(null);
 let tefaStoreId = null;
 let nextPage = 1;
 let observer;
+
+const DEFAULT_CATEGORIES = ['All', 'Makanan', 'Minuman', 'Bahan Masakan', 'Kesehatan & Kebersihan'];
 
 const categories = computed(() => {
   const dynamic = new Set();
@@ -22,13 +26,17 @@ const categories = computed(() => {
     if (p.category?.name) dynamic.add(p.category.name);
     else if (p.category) dynamic.add(p.category);
   });
+  if (dynamic.size === 0) return DEFAULT_CATEGORIES;
   return ['All', ...Array.from(dynamic)];
 });
 
-const allProducts = computed(() => apiProducts.value);
-const newestTefaProducts = computed(() => apiProducts.value.slice(0, 5));
+const isTefaClosed = computed(() => tefaStore.value && tefaStore.value.is_open === false);
+
+const allProducts = computed(() => (isTefaClosed.value ? [] : apiProducts.value));
+const newestTefaProducts = computed(() => (isTefaClosed.value ? [] : apiProducts.value.slice(0, 5)));
 
 const filteredProducts = computed(() => {
+  if (isTefaClosed.value) return [];
   return allProducts.value.filter((p) => {
     const catName = p.category?.name || p.category;
     const matchCategory =
@@ -62,9 +70,12 @@ function handleLoadMore(entries) {
 onMounted(async () => {
   try {
     const tefaStores = await getStores({ type: 'tefa' });
-    const tefaStore = tefaStores.find((s) => s.store_type === 'tefa') || tefaStores[0];
-    tefaStoreId = tefaStore?.id || null;
-    await loadProducts();
+    const found = tefaStores.find((s) => s.store_type === 'tefa') || tefaStores[0];
+    tefaStore.value = found || null;
+    tefaStoreId = found?.id || null;
+    if (tefaStore.value && tefaStore.value.is_open !== false) {
+      await loadProducts();
+    }
   } catch {
     apiProducts.value = [];
   }
@@ -105,35 +116,50 @@ onBeforeUnmount(() => observer?.disconnect());
         </div>
       </section>
 
-      <!-- Newest Section -->
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">Newest</h2>
-        </div>
-        <div class="carousel-track">
-          <ProductCard
-            v-for="item in newestTefaProducts"
-            :key="'tefa-new-' + item.id"
-            :product="item"
-            compact
+      <!-- Closed Store Empty State -->
+      <ClosedStoreEmptyState
+        v-if="isTefaClosed"
+        title="TEFA is Closed"
+        message="The food never stops, come back again when it opens."
+      />
+
+      <template v-else>
+        <!-- Newest Section -->
+        <section v-if="newestTefaProducts.length > 0" class="section">
+          <div class="section-header">
+            <h2 class="section-title">Newest</h2>
+          </div>
+          <div class="carousel-track">
+            <ProductCard
+              v-for="item in newestTefaProducts"
+              :key="'tefa-new-' + item.id"
+              :product="item"
+              compact
+            />
+          </div>
+        </section>
+
+        <!-- Products Section -->
+        <section class="section">
+          <div class="section-header">
+            <h2 class="section-title">Products</h2>
+          </div>
+          <div v-if="filteredProducts.length > 0" class="product-grid">
+            <ProductCard
+              v-for="item in filteredProducts"
+              :key="'tefa-' + item.id"
+              :product="item"
+            />
+          </div>
+          <ClosedStoreEmptyState
+            v-else-if="!loadingMore && apiProducts.length === 0"
+            title="TEFA is Closed"
+            message="The food never stops, come back again when it opens."
           />
-        </div>
-      </section>
-      <!-- Products Section -->
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">Products</h2>
-        </div>
-        <div class="product-grid">
-          <ProductCard
-            v-for="item in filteredProducts"
-            :key="'tefa-' + item.id"
-            :product="item"
-          />
-        </div>
-        <p v-if="loadingMore" class="load-status" aria-live="polite">Memuat produk...</p>
-        <div ref="loadMoreTarget" class="load-more-target" aria-hidden="true" />
-      </section>
+          <p v-if="loadingMore" class="load-status" aria-live="polite">Memuat produk...</p>
+          <div ref="loadMoreTarget" class="load-more-target" aria-hidden="true" />
+        </section>
+      </template>
 
 
     </main>
