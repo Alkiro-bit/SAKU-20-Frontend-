@@ -15,7 +15,7 @@ async function fetchStores() {
     const res = await apiClient.get('/superadmin/stores');
     stores.value = res.data?.data || [];
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memuat data toko.');
+    error.value = getApiErrorMessage(e, 'Failed to load store data.');
   }
 }
 
@@ -24,7 +24,7 @@ async function fetchUsers() {
     const res = await apiClient.get('/superadmin/users');
     users.value = res.data?.data || [];
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memuat data user.');
+    error.value = getApiErrorMessage(e, 'Failed to load user data.');
   }
 }
 
@@ -33,7 +33,7 @@ async function fetchCategories() {
     const res = await apiClient.get('/superadmin/categories');
     categories.value = res.data?.data || [];
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memuat kategori.');
+    error.value = getApiErrorMessage(e, 'Failed to load categories.');
   }
 }
 
@@ -66,7 +66,7 @@ onMounted(() => {
     <div class="page-heading">
       <div>
         <h1 class="page-title">Superadmin Dashboard</h1>
-        <p class="page-subtitle">Ringkasan operasional seluruh platform SAKU 20</p>
+        <p class="page-subtitle">Operational overview of the entire SAKU 20 platform</p>
       </div>
       <button type="button" class="action-btn" title="Refresh data" :disabled="loading" @click="refreshAll">
         <Icon icon="mdi:refresh" width="18" height="18" :class="{ 'spin-icon': loading }" />
@@ -86,9 +86,9 @@ onMounted(() => {
           <Icon icon="entypo:shop" width="24" height="24" />
         </div>
         <div class="stat-content">
-          <span class="stat-label">Total Toko</span>
+          <span class="stat-label">Total Stores</span>
           <span class="stat-value">{{ stores.length }}</span>
-          <span class="stat-hint">{{ openStoresCount }} toko buka</span>
+          <span class="stat-hint">{{ openStoresCount }} open stores</span>
         </div>
       </router-link>
 
@@ -97,9 +97,9 @@ onMounted(() => {
           <Icon icon="mdi:account-group" width="24" height="24" />
         </div>
         <div class="stat-content">
-          <span class="stat-label">Total Pengguna</span>
+          <span class="stat-label">Total Users</span>
           <span class="stat-value">{{ users.length }}</span>
-          <span class="stat-hint">{{ activeUsersCount }} akun aktif</span>
+          <span class="stat-hint">{{ activeUsersCount }} active accounts</span>
         </div>
       </router-link>
 
@@ -108,9 +108,9 @@ onMounted(() => {
           <Icon icon="mdi:shape-outline" width="24" height="24" />
         </div>
         <div class="stat-content">
-          <span class="stat-label">Total Kategori</span>
+          <span class="stat-label">Total Categories</span>
           <span class="stat-value">{{ categories.length }}</span>
-          <span class="stat-hint">Kategori produk aktif</span>
+          <span class="stat-hint">Active product categories</span>
         </div>
       </router-link>
     </div>
@@ -126,29 +126,29 @@ onMounted(() => {
           :class="{ active: activeTab === tab }"
           @click="activeTab = tab"
         >
-          {{ tab === 'stores' ? 'Preview Toko' : tab === 'users' ? 'Preview User' : 'Preview Kategori' }}
+          {{ tab === 'stores' ? 'Stores Preview' : tab === 'users' ? 'Users Preview' : 'Categories Preview' }}
         </button>
       </nav>
 
       <div class="tab-content">
-        <div v-if="loading" class="loading-state">Memuat data...</div>
+        <div v-if="loading" class="loading-state">Loading data...</div>
 
         <template v-else>
           <!-- Stores Tab -->
           <div v-if="activeTab === 'stores'" class="panel-list">
-            <div v-if="stores.length === 0" class="empty">Belum ada toko terdaftar.</div>
+            <div v-if="stores.length === 0" class="empty">No registered stores yet.</div>
             <div v-for="s in stores" :key="s.id" class="list-item">
               <div class="item-info">
                 <span class="item-name">{{ s.name }}</span>
-                <span class="item-sub">{{ s.store_type || s.type }} — {{ s.is_open ? 'Buka' : 'Tutup' }}</span>
+                <span class="item-sub">{{ s.store_type || s.type }} — {{ s.is_open ? 'Open' : 'Closed' }}</span>
               </div>
-              <router-link to="/superadmin/stores" class="link-btn">Lihat semua &rarr;</router-link>
+              <router-link to="/superadmin/stores" class="link-btn">View all &rarr;</router-link>
             </div>
           </div>
 
           <!-- Users Tab -->
           <div v-if="activeTab === 'users'" class="panel-list">
-            <div v-if="users.length === 0" class="empty">Belum ada user.</div>
+            <div v-if="users.length === 0" class="empty">No users found.</div>
             <div v-for="u in users" :key="u.id" class="list-item">
               <div class="item-info">
                 <span class="item-name">{{ u.name }}</span>
@@ -160,17 +160,17 @@ onMounted(() => {
                 :class="{ active: u.is_active }"
                 @click="toggleUserStatus(u)"
               >
-                {{ u.is_active ? 'Aktif' : 'Nonaktif' }}
+                {{ u.is_active ? 'Active' : 'Inactive' }}
               </button>
             </div>
           </div>
 
           <!-- Categories Tab -->
           <div v-if="activeTab === 'categories'" class="panel-list">
-            <div v-if="categories.length === 0" class="empty">Belum ada kategori.</div>
+            <div v-if="categories.length === 0" class="empty">No categories found.</div>
             <div v-for="c in categories" :key="c.id" class="list-item">
               <span class="item-name">{{ c.name }}</span>
-              <router-link to="/superadmin/categories" class="link-btn">Detail &rarr;</router-link>
+              <router-link to="/superadmin/categories" class="link-btn">Details &rarr;</router-link>
             </div>
           </div>
         </template>

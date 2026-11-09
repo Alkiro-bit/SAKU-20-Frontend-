@@ -17,7 +17,7 @@ async function fetchUsers() {
     const res = await apiClient.get('/superadmin/users');
     users.value = res.data?.data || [];
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memuat data pengguna.');
+    error.value = getApiErrorMessage(e, 'Failed to load user data.');
   } finally {
     loading.value = false;
   }
@@ -31,7 +31,7 @@ async function toggleUserStatus(user) {
     await apiClient.patch(`/superadmin/users/${user.id}/status`, { is_active: nextStatus });
     user.is_active = nextStatus;
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal mengubah status pengguna.');
+    error.value = getApiErrorMessage(e, 'Failed to update user status.');
   } finally {
     togglingUserId.value = null;
   }
@@ -56,7 +56,7 @@ onMounted(() => {
     <div class="page-heading">
       <div>
         <h1 class="page-title">Users Management</h1>
-        <p class="page-subtitle">Daftar semua pengguna terdaftar dan kelola akses akun</p>
+        <p class="page-subtitle">List all registered users and manage account access</p>
       </div>
       <button type="button" class="action-btn" title="Refresh data" :disabled="loading" @click="fetchUsers">
         <Icon icon="mdi:refresh" width="18" height="18" :class="{ 'spin-icon': loading }" />
@@ -71,7 +71,7 @@ onMounted(() => {
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="Cari user berdasarkan nama, email, atau NIS/NIP..."
+          placeholder="Search user by name, email, or NIS/NIP..."
           class="search-input"
         />
       </div>
@@ -83,7 +83,7 @@ onMounted(() => {
           :class="{ active: selectedRole === 'all' }"
           @click="selectedRole = 'all'"
         >
-          Semua ({{ users.length }})
+          All ({{ users.length }})
         </button>
         <button
           type="button"
@@ -91,7 +91,7 @@ onMounted(() => {
           :class="{ active: selectedRole === 'pembeli' }"
           @click="selectedRole = 'pembeli'"
         >
-          Pembeli
+          Buyer
         </button>
         <button
           type="button"
@@ -116,7 +116,7 @@ onMounted(() => {
     <div v-if="error" class="error-banner" role="alert">
       <Icon icon="mdi:alert-circle-outline" width="20" height="20" />
       <span>{{ error }}</span>
-      <button type="button" class="retry-btn" @click="fetchUsers">Coba Lagi</button>
+      <button type="button" class="retry-btn" @click="fetchUsers">Try Again</button>
     </div>
 
     <!-- Loading State -->
@@ -127,7 +127,7 @@ onMounted(() => {
     <!-- Empty State -->
     <div v-else-if="filteredUsers.length === 0" class="empty-state">
       <Icon icon="mdi:account-group" width="48" height="48" class="empty-icon" />
-      <p class="empty-text">Tidak ada pengguna yang sesuai dengan pencarian.</p>
+      <p class="empty-text">No users match the search.</p>
     </div>
 
     <!-- Users Table/List -->
@@ -170,7 +170,7 @@ onMounted(() => {
             width="16"
             height="16"
           />
-          <span>{{ u.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+          <span>{{ u.is_active ? 'Active' : 'Inactive' }}</span>
         </button>
       </article>
     </div>

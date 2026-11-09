@@ -15,7 +15,7 @@ async function fetchCategories() {
     const res = await apiClient.get('/superadmin/categories');
     categories.value = res.data?.data || [];
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memuat kategori.');
+    error.value = getApiErrorMessage(e, 'Failed to load categories.');
   } finally {
     loading.value = false;
   }
@@ -37,7 +37,7 @@ onMounted(() => {
     <div class="page-heading">
       <div>
         <h1 class="page-title">Categories Management</h1>
-        <p class="page-subtitle">Daftar kategori produk dalam sistem SAKU 20</p>
+        <p class="page-subtitle">List of product categories in SAKU 20</p>
       </div>
       <button type="button" class="action-btn" title="Refresh data" :disabled="loading" @click="fetchCategories">
         <Icon icon="mdi:refresh" width="18" height="18" :class="{ 'spin-icon': loading }" />
@@ -52,7 +52,7 @@ onMounted(() => {
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="Cari kategori..."
+          placeholder="Search categories..."
           class="search-input"
         />
       </div>
@@ -62,7 +62,7 @@ onMounted(() => {
     <div v-if="error" class="error-banner" role="alert">
       <Icon icon="mdi:alert-circle-outline" width="20" height="20" />
       <span>{{ error }}</span>
-      <button type="button" class="retry-btn" @click="fetchCategories">Coba Lagi</button>
+      <button type="button" class="retry-btn" @click="fetchCategories">Try Again</button>
     </div>
 
     <!-- Loading State -->
@@ -73,7 +73,7 @@ onMounted(() => {
     <!-- Empty State -->
     <div v-else-if="filteredCategories.length === 0" class="empty-state">
       <Icon icon="mdi:shape-outline" width="48" height="48" class="empty-icon" />
-      <p class="empty-text">Tidak ada kategori yang ditemukan.</p>
+      <p class="empty-text">No categories found.</p>
     </div>
 
     <!-- Categories Grid -->

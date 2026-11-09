@@ -16,7 +16,7 @@ async function fetchStores() {
     const res = await apiClient.get('/superadmin/stores');
     stores.value = res.data?.data || [];
   } catch (e) {
-    error.value = getApiErrorMessage(e, 'Gagal memuat data toko.');
+    error.value = getApiErrorMessage(e, 'Failed to load store data.');
   } finally {
     loading.value = false;
   }
@@ -41,7 +41,7 @@ onMounted(() => {
     <div class="page-heading">
       <div>
         <h1 class="page-title">Stores Management</h1>
-        <p class="page-subtitle">Daftar semua toko terdaftar di SAKU 20</p>
+        <p class="page-subtitle">List of all registered stores in SAKU 20</p>
       </div>
       <button type="button" class="action-btn" title="Refresh data" :disabled="loading" @click="fetchStores">
         <Icon icon="mdi:refresh" width="18" height="18" :class="{ 'spin-icon': loading }" />
@@ -56,7 +56,7 @@ onMounted(() => {
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="Cari toko berdasarkan nama..."
+          placeholder="Search stores by name..."
           class="search-input"
         />
       </div>
@@ -68,7 +68,7 @@ onMounted(() => {
           :class="{ active: selectedType === 'all' }"
           @click="selectedType = 'all'"
         >
-          Semua ({{ stores.length }})
+          All ({{ stores.length }})
         </button>
         <button
           type="button"
@@ -76,7 +76,7 @@ onMounted(() => {
           :class="{ active: selectedType === 'siswa' }"
           @click="selectedType = 'siswa'"
         >
-          Siswa
+          Student
         </button>
         <button
           type="button"
@@ -93,7 +93,7 @@ onMounted(() => {
     <div v-if="error" class="error-banner" role="alert">
       <Icon icon="mdi:alert-circle-outline" width="20" height="20" />
       <span>{{ error }}</span>
-      <button type="button" class="retry-btn" @click="fetchStores">Coba Lagi</button>
+      <button type="button" class="retry-btn" @click="fetchStores">Try Again</button>
     </div>
 
     <!-- Loading State -->
@@ -104,7 +104,7 @@ onMounted(() => {
     <!-- Empty State -->
     <div v-else-if="filteredStores.length === 0" class="empty-state">
       <Icon icon="entypo:shop" width="48" height="48" class="empty-icon" />
-      <p class="empty-text">Tidak ada toko yang sesuai dengan pencarian.</p>
+      <p class="empty-text">No stores match the search.</p>
     </div>
 
     <!-- Stores Grid -->
@@ -119,7 +119,7 @@ onMounted(() => {
             <div class="store-badges">
               <span class="badge badge-type">{{ s.store_type || s.type || 'siswa' }}</span>
               <span class="badge" :class="s.is_open ? 'badge-open' : 'badge-closed'">
-                {{ s.is_open ? 'Buka' : 'Tutup' }}
+                {{ s.is_open ? 'Open' : 'Closed' }}
               </span>
             </div>
           </div>
