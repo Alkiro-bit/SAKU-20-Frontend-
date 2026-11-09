@@ -6,6 +6,10 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  label: {
+    type: String,
+    default: '',
+  },
 });
 
 const statusConfig = {
@@ -36,7 +40,7 @@ const current = computed(() => {
       borderColor: current.color,
     }"
   >
-    {{ current.label }}
+    {{ label || current.label }}
   </span>
 </template>
 

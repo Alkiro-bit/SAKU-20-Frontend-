@@ -1,13 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Icon } from '@iconify/vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/auth';
+import AdminSidebar from '@/components/layout/AdminSidebar.vue';
+import AdminHeader from '@/components/layout/AdminHeader.vue';
 import { apiClient, getApiErrorMessage } from '@/services/api';
 import { usePolling } from '@/composables/usePolling';
-
-const router = useRouter();
-const authStore = useAuthStore();
 
 const store = ref(null);
 const orders = ref([]);
@@ -284,12 +281,6 @@ async function refreshData() {
   loading.value = false;
 }
 
-// Handle Logout
-async function handleLogout() {
-  await authStore.logout();
-  router.replace('/login');
-}
-
 function toggleSidebar() {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
 }
@@ -315,99 +306,21 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="admin-layout" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
+  <div class="admin-layout">
     <!-- Sidebar -->
-    <aside class="admin-sidebar">
-      <div class="sidebar-header">
-        <div class="brand-logo">
-          <span class="brand-text">SAKU 20</span>
-        </div>
-        <button
-          type="button"
-          class="sidebar-toggle-btn"
-          title="Toggle Sidebar"
-          @click="toggleSidebar"
-        >
-          <Icon
-            :icon="isSidebarCollapsed ? 'mdi:menu' : 'mdi:menu-open'"
-            width="20"
-            height="20"
-          />
-        </button>
-      </div>
-
-      <nav class="sidebar-nav">
-        <!-- Dashboard (Active) -->
-        <router-link to="/admin/dashboard" class="nav-item active">
-          <Icon icon="bxs:dashboard" class="nav-icon active-icon" width="20" height="20" />
-          <span class="nav-label">Dashboard</span>
-        </router-link>
-
-        <!-- Orders -->
-        <router-link to="/admin/orders" class="nav-item">
-          <Icon icon="bi:bag-fill" class="nav-icon" width="18" height="18" />
-          <span class="nav-label">Orders</span>
-        </router-link>
-
-        <!-- Products & Stock -->
-        <router-link to="/admin/products" class="nav-item">
-          <Icon icon="bxs:box" class="nav-icon" width="20" height="20" />
-          <span class="nav-label">Products &amp; Stock</span>
-        </router-link>
-      </nav>
-
-      <div class="sidebar-footer">
-        <button type="button" class="logout-action-btn" @click="handleLogout">
-          <Icon icon="mdi:logout" width="18" height="18" />
-          <span class="logout-label">Logout</span>
-        </button>
-      </div>
-    </aside>
+    <AdminSidebar v-model:collapsed="isSidebarCollapsed" />
 
     <!-- Main Screen -->
     <div class="admin-main">
       <!-- Header -->
-      <header class="admin-topbar">
-        <div class="topbar-left">
-          <button
-            type="button"
-            class="mobile-toggle-btn"
-            @click="toggleSidebar"
-            aria-label="Toggle menu"
-          >
-            <Icon icon="mdi:menu" width="24" height="24" />
-          </button>
-          <div class="shop-badge">
-            <Icon icon="entypo:shop" width="30" height="30" class="shop-icon" />
-            <div class="shop-meta">
-              <span class="shop-name">{{ store?.name || 'JungleFood' }}</span>
-              <span v-if="store?.store_type" class="store-type-badge">{{ store.store_type }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="topbar-right">
-          <button
-            type="button"
-            class="refresh-btn"
-            title="Refresh Data"
-            :disabled="loading || refreshingLiveData || togglingStore"
-            @click="refreshData"
-          >
-            <Icon
-              icon="mdi:refresh"
-              width="20"
-              height="20"
-              :class="{ 'spin-icon': loading || refreshingLiveData }"
-            />
-            <span class="refresh-label">Refresh</span>
-          </button>
-          <div class="user-pill" v-if="authStore.user">
-            <span class="user-greeting">Hi, {{ authStore.user.name || 'Admin' }}</span>
-          </div>
-        </div>
-      </header>
-
+      <AdminHeader
+        :store="store"
+        fallback-name="Store"
+        :refreshing="loading || refreshingLiveData"
+        :refresh-disabled="loading || refreshingLiveData || togglingStore"
+        @toggle-sidebar="toggleSidebar"
+        @refresh="refreshData"
+      />
       <!-- Main Content -->
       <main class="dashboard-content">
         <div v-if="error" class="error-banner" role="alert">
@@ -672,254 +585,12 @@ onUnmounted(() => {
   font-family: var(--font-family-base);
 }
 
-/* Sidebar */
-.admin-sidebar {
-  width: 250px;
-  background-color: #ffffff;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
-  flex-shrink: 0;
-  padding: 14px 10px 14px 20px;
-  transition: width var(--transition-fast), padding var(--transition-fast);
-  z-index: 20;
-}
-
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 0;
-  width: 100%;
-}
-
-.brand-text {
-  font-family: var(--font-family-brand);
-  font-weight: 600;
-  font-size: 24px;
-  color: #008cff;
-  letter-spacing: -2.4px;
-  user-select: none;
-}
-
-.sidebar-toggle-btn {
-  color: #969696;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  border-radius: var(--radius-md);
-  transition: background-color var(--transition-fast);
-}
-
-.sidebar-toggle-btn:hover {
-  background-color: rgba(0, 140, 255, 0.1);
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  margin-top: 10px;
-  flex: 1;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  text-decoration: none;
-  transition: all var(--transition-fast);
-  color: #969696;
-}
-
-.nav-item:hover {
-  background-color: #f7f9fa;
-  color: #000000;
-}
-
-.nav-item.active {
-  background-color: #ffffff;
-  filter: drop-shadow(0px 0px 5px rgba(0, 0, 0, 0.25));
-  color: #000000;
-}
-
-.nav-label {
-  font-family: var(--font-family-brand);
-  font-weight: var(--font-weight-medium);
-  font-size: 18px;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.nav-icon {
-  flex-shrink: 0;
-}
-
-.active-icon {
-  color: #000000;
-}
-
-.sidebar-footer {
-  padding-top: 16px;
-  border-top: 0.5px solid #e0e0e0;
-}
-
-.logout-action-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  color: #969696;
-  width: 100%;
-  transition: all var(--transition-fast);
-}
-
-.logout-action-btn:hover {
-  color: #b42318;
-  background-color: rgba(180, 35, 24, 0.08);
-}
-
-.logout-label {
-  font-family: var(--font-family-brand);
-  font-weight: var(--font-weight-medium);
-  font-size: 16px;
-}
-
-/* Sidebar Collapsed State (Tablet / Desktop toggle) */
-.sidebar-collapsed .admin-sidebar {
-  width: 72px;
-  padding: 14px 10px;
-  align-items: center;
-}
-
-.sidebar-collapsed .brand-text,
-.sidebar-collapsed .nav-label,
-.sidebar-collapsed .logout-label {
-  display: none;
-}
-
-.sidebar-collapsed .nav-item {
-  justify-content: center;
-  padding: 10px;
-}
-
-.sidebar-collapsed .sidebar-header {
-  justify-content: center;
-}
-
 /* Main Content Area */
 .admin-main {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-}
-
-/* Topbar */
-.admin-topbar {
-  background-color: #ffffff;
-  height: 100px;
-  padding: 10px 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: 10px 0px 10px 0px rgba(0, 0, 0, 0.25);
-  z-index: 10;
-}
-
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.mobile-toggle-btn {
-  display: none;
-  color: #000000;
-  padding: 6px;
-}
-
-.shop-badge {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.shop-icon {
-  color: #000000;
-  flex-shrink: 0;
-}
-
-.shop-meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.shop-name {
-  font-family: var(--font-family-brand);
-  font-weight: var(--font-weight-medium);
-  font-size: 24px;
-  color: #000000;
-}
-
-.store-type-badge {
-  background-color: #f0f0f0;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-  text-transform: capitalize;
-}
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.refresh-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background-color: #f5f5f5;
-  color: #000000;
-  font-size: var(--font-size-sm);
-  font-family: var(--font-family-base);
-  transition: background-color var(--transition-fast);
-}
-
-.refresh-btn:hover:not(:disabled) {
-  background-color: #e5e5e5;
-}
-
-.refresh-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.spin-icon {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-.user-greeting {
-  font-family: var(--font-family-base);
-  font-weight: var(--font-weight-medium);
-  font-size: var(--font-size-sm);
-  color: #000000;
 }
 
 /* Dashboard Content */
@@ -1613,10 +1284,6 @@ onUnmounted(() => {
     gap: 20px;
   }
 
-  .admin-topbar {
-    padding: 10px 24px;
-  }
-
   .dashboard-content {
     padding: 20px 24px;
   }
@@ -1632,23 +1299,6 @@ onUnmounted(() => {
     position: relative;
   }
 
-  .admin-sidebar {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    transform: translateX(-100%);
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
-  }
-
-  .admin-layout:not(.sidebar-collapsed) .admin-sidebar {
-    transform: translateX(0);
-  }
-
-  .mobile-toggle-btn {
-    display: inline-flex;
-  }
-
   .dashboard-summary {
     padding: 20px;
   }
@@ -1660,15 +1310,6 @@ onUnmounted(() => {
   .stats-grid {
     flex-direction: column;
     gap: 14px;
-  }
-
-  .refresh-label {
-    display: none;
-  }
-
-  .admin-topbar {
-    height: 80px;
-    padding: 10px 16px;
   }
 
   .dashboard-content {
