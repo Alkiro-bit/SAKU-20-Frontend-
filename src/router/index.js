@@ -92,13 +92,31 @@ const routes = [
   },
   {
     path: '/superadmin',
-    redirect: '/superadmin/dashboard',
-  },
-  {
-    path: '/superadmin/dashboard',
-    name: 'superadmin-dashboard',
-    component: SuperadminDashboardView,
+    component: () => import('@/layouts/SuperadminLayout.vue'),
     meta: { requiresAuth: true, role: 'superadmin' },
+    children: [
+      { path: '', redirect: '/superadmin/dashboard' },
+      {
+        path: 'dashboard',
+        name: 'superadmin-dashboard',
+        component: SuperadminDashboardView,
+      },
+      {
+        path: 'stores',
+        name: 'superadmin-stores',
+        component: () => import('@/views/superadmin/SuperadminStoresView.vue'),
+      },
+      {
+        path: 'users',
+        name: 'superadmin-users',
+        component: () => import('@/views/superadmin/SuperadminUsersView.vue'),
+      },
+      {
+        path: 'categories',
+        name: 'superadmin-categories',
+        component: () => import('@/views/superadmin/SuperadminCategoriesView.vue'),
+      },
+    ],
   },
   {
     path: '/:pathMatch(.*)*',
