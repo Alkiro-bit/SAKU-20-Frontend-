@@ -67,6 +67,17 @@ onBeforeUnmount(() => {
         id="profile-menu-options"
         class="profile-dropdown"
       >
+        <div
+          v-if="authStore.isPembeli && (authStore.user?.name || authStore.user?.email)"
+          class="profile-account"
+        >
+          <p v-if="authStore.user?.name" class="profile-account-name">
+            {{ authStore.user.name }}
+          </p>
+          <p v-if="authStore.user?.email" class="profile-account-email">
+            {{ authStore.user.email }}
+          </p>
+        </div>
         <button type="button" class="dropdown-item logout-item" @click="handleLogout">
           <Icon icon="mdi:logout" width="20" height="20" />
           <span>Logout</span>
@@ -120,12 +131,39 @@ onBeforeUnmount(() => {
   top: calc(100% + 8px);
   right: 0;
   z-index: 1;
+  width: max-content;
   min-width: 180px;
+  max-width: min(320px, calc(100vw - 32px));
   padding: 6px;
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
+}
+
+.profile-account {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.profile-account-name,
+.profile-account-email {
+  overflow-wrap: anywhere;
+  font-family: var(--font-family-base);
+  line-height: 1.4;
+}
+
+.profile-account-name {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.profile-account-email {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
 }
 
 .dropdown-item {

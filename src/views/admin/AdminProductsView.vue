@@ -3,12 +3,26 @@ import { computed, onMounted, ref } from 'vue';
 import { Icon } from '@iconify/vue';
 import AdminSidebar from '@/components/layout/AdminSidebar.vue';
 import AdminHeader from '@/components/layout/AdminHeader.vue';
-import { apiClient, getApiErrorMessage, resolveImageUrl } from '@/services/api';
+import ProductModal from '@/components/modules/ProductModal.vue';
+import {
+  apiClient,
+  getApiErrorMessage,
+  getApiValidationErrors,
+  resolveImageUrl,
+} from '@/services/api';
 
+const store = ref(null);
 const products = ref([]);
+const categories = ref([]);
 const searchQuery = ref('');
 const loading = ref(true);
 const productsError = ref('');
+const modalOpen = ref(false);
+const categoriesLoading = ref(false);
+const categoriesError = ref('');
+const submittingProduct = ref(false);
+const productSubmitError = ref('');
+const productFieldErrors = ref({});
 const isSidebarCollapsed = ref(false);
 
 const visibleProducts = computed(() => {
@@ -66,7 +80,59 @@ async function fetchProducts() {
   return items;
 }
 
-async function loadProducts() {
+async function fetchStore() {
+  const response = await apiClient.get('/admin/store');
+  return response.data?.data || null;
+}
+
+async function loadCategories() {
+  categoriesLoading.value = true;
+  categoriesError.value = '';
+
+  try {
+    const response = await apiClient.get('/categories');
+    const items = response.data?.data;
+    if (!Array.isArray(items)) {
+      throw new Error('Respons kategori tidak berisi daftar data yang valid.');
+    }
+    categories.value = items;
+    if (items.length === 0) categoriesError.value = 'No categories are available.';
+  } catch (error) {
+    categoriesError.value =
+      error instanceof Error && !error.response
+        ? error.message
+        : getApiErrorMessage(error, 'Gagal memuat kategori.');
+  } finally {
+    categoriesLoading.value = false;
+  }
+}
+
+async function loadData() {
+  loading.value = true;
+  productsError.value = '';
+
+  const [productsResult, storeResult] = await Promise.allSettled([
+    fetchProducts(),
+    fetchStore(),
+  ]);
+
+  if (productsResult.status === 'fulfilled') {
+    products.value = productsResult.value;
+  } else {
+    productsError.value =
+      productsResult.reason instanceof Error && !productsResult.reason.response
+        ? productsResult.reason.message
+        : getApiErrorMessage(productsResult.reason, 'Gagal memuat daftar produk.');
+  }
+
+  if (storeResult.status === 'fulfilled') {
+    store.value = storeResult.value;
+  }
+
+  loading.value = false;
+}
+
+async function refreshProducts() {
   loading.value = true;
   productsError.value = '';
 
@@ -82,11 +148,46 @@ async function loadProducts() {
   }
 }
 
+async function openAddProductModal() {
+  modalOpen.value = true;
+  productSubmitError.value = '';
+  productFieldErrors.value = {};
+  if (!categories.value.length && !categoriesLoading.value) {
+    await loadCategories();
+  }
+}
+
+async function createProduct(product) {
+  if (submittingProduct.value) return;
+
+  submittingProduct.value = true;
+  productSubmitError.value = '';
+  productFieldErrors.value = {};
+  const formData = new FormData();
+  formData.append('category_id', String(product.category_id));
+  formData.append('name', product.name);
+  formData.append('description', product.description);
+  formData.append('price', String(product.price));
+  formData.append('stock', String(product.stock));
+  if (product.image) formData.append('image', product.image);
+
+  try {
+    await apiClient.post('/admin/products', formData);
+    modalOpen.value = false;
+    await refreshProducts();
+  } catch (error) {
+    productFieldErrors.value = getApiValidationErrors(error);
+    productSubmitError.value = getApiErrorMessage(error, 'Gagal menambahkan produk.');
+  } finally {
+    submittingProduct.value = false;
+  }
+}
+
 function toggleSidebar() {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
 }
 
-onMounted(loadProducts);
+onMounted(loadData);
 </script>
 
 <template>
@@ -95,6 +196,8 @@ onMounted(loadProducts);
 
     <div class="admin-main">
       <AdminHeader
+        :store="store"
+        fallback-name="Store"
         :show-refresh="false"
         @toggle-sidebar="toggleSidebar"
       />
@@ -122,7 +225,7 @@ onMounted(loadProducts);
           <div v-if="productsError" class="error-state" role="alert">
             <Icon icon="mdi:alert-circle-outline" width="22" height="22" aria-hidden="true" />
             <span>{{ productsError }}</span>
-            <button type="button" class="retry-button" @click="loadProducts">Try again</button>
+            <button type="button" class="retry-button" @click="loadData">Try again</button>
           </div>
 
           <div v-else-if="loading" class="product-grid loading-grid" aria-hidden="true">
@@ -133,13 +236,12 @@ onMounted(loadProducts);
             </div>
           </div>
 
-          <div v-else-if="visibleProducts.length" class="product-grid">
+          <div v-else class="product-grid">
             <button
               type="button"
               class="add-product-card"
-              disabled
-              title="Add product will be available in a future update"
-              aria-label="Add product, available in a future update"
+              aria-label="Add product"
+              @click="openAddProductModal"
             >
               <Icon icon="mdi:plus" width="26" height="26" aria-hidden="true" />
               <span>Add Product</span>
@@ -188,15 +290,29 @@ onMounted(loadProducts);
                 </button>
               </div>
             </article>
-          </div>
 
-          <div v-else class="empty-state" role="status">
-            <Icon icon="mdi:package-variant-closed" width="32" height="32" aria-hidden="true" />
-            <p>{{ searchQuery ? 'No products found.' : 'No products yet.' }}</p>
+            <div v-if="!visibleProducts.length" class="empty-state" role="status">
+              <Icon icon="mdi:package-variant-closed" width="32" height="32" aria-hidden="true" />
+              <p>{{ searchQuery ? 'No products found.' : 'No products yet.' }}</p>
+            </div>
           </div>
         </section>
       </main>
     </div>
+
+    <ProductModal
+      v-if="modalOpen"
+      mode="create"
+      :categories="categories"
+      :categories-loading="categoriesLoading"
+      :categories-error="categoriesError"
+      :submitting="submittingProduct"
+      :submit-error="productSubmitError"
+      :field-errors="productFieldErrors"
+      @close="modalOpen = false"
+      @submit="createProduct"
+      @retry-categories="loadCategories"
+    />
   </div>
 </template>
 
@@ -209,7 +325,7 @@ onMounted(loadProducts);
 
 .admin-main {
   display: flex;
-  flex: 1;
+    flex: 1;
   flex-direction: column;
   min-width: 0;
 }
@@ -466,6 +582,7 @@ onMounted(loadProducts);
 }
 
 .empty-state {
+  grid-column: 1 / -1;
   flex-direction: column;
   color: var(--color-text-muted);
 }
