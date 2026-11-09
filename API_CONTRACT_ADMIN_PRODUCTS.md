@@ -14,7 +14,7 @@ Scope: Hanya produk milik toko admin yang login (`stores.owner_user_id = auth us
 | GET | `/admin/products` | — | Daftar produk toko sendiri |
 | POST | `/admin/products` | `multipart/form-data` | Tambah produk baru |
 | PATCH | `/admin/products/{id}` | `multipart/form-data` | Update sebagian/seluruh field |
-| DELETE | `/admin/products/{id}` | — | Soft delete (`is_active = false`) |
+| DELETE | `/admin/products/{id}` | — | Hard delete produk |
 
 ---
 
@@ -139,25 +139,25 @@ Sama dengan response create, berisi produk ter-update.
 
 ---
 
-## 5. DELETE /admin/products/{id} (Soft Delete)
+## 5. DELETE /admin/products/{id} (Hard Delete)
 
 **Middleware:** `auth:sanctum`, `active`, `admin`  
 **Scope:** Hanya produk milik toko admin yang login.
 
 ### Perilaku
-Tidak melakukan hard delete. Mengatur `is_active = false` pada produk tersebut. Riwayat `ORDER_ITEMS` yang merujuk produk ini tetap utuh.
+Menghapus produk secara permanen. Produk yang sudah direferensikan oleh `ORDER_ITEMS` tidak dapat dihapus.
 
 ### Response (200 OK)
 ```json
 {
   "success": true,
-  "data": {
-    "id": 123,
-    "is_active": false
-  },
-  "message": "Produk berhasil dinonaktifkan"
+  "message": "Produk berhasil dihapus"
 }
 ```
+
+### Error
+- `404 Not Found`: Produk tidak ditemukan atau bukan milik toko admin yang login.
+- `409 Conflict`: Produk tidak dapat dihapus karena sudah tercatat dalam riwayat pesanan.
 
 ---
 
@@ -222,7 +222,7 @@ Tidak melakukan hard delete. Mengatur `is_active = false` pada produk tersebut. 
 1. **`category_id` wajib untuk semua admin**, bukan hanya TEFA. Non-TEFA (siswa) juga harus memilih kategori saat create produk.
 2. **Tidak ada filter kategori per store_type.** `GET /api/v1/categories` mengembalikan semua kategori global.
 3. **`store_id` tidak dikirim dari frontend.** Backend otomatis mengaitkan produk ke toko milik admin yang login.
-4. **Soft delete.** DELETE hanya meng-set `is_active = false`, bukan menghapus baris dari database.
+4. **Hard delete.** DELETE menghapus produk dari database secara permanen dan ditolak bila produk sudah ada di `ORDER_ITEMS`.
 5. **Gambar dikonversi ke WebP** di backend. Frontend hanya perlu mengirim file asli via multipart.
 
 ---

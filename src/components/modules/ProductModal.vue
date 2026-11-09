@@ -63,6 +63,11 @@ const imagePreview = computed(() => {
   return image ? resolveImageUrl(image) : '';
 });
 const title = computed(() => (props.mode === 'edit' ? 'Edit Product' : 'Add Product'));
+const description = computed(() =>
+  props.mode === 'edit'
+    ? 'Update product information and stock.'
+    : 'Add product information and stock.',
+);
 const submitLabel = computed(() => (props.mode === 'edit' ? 'Save Changes' : 'Add Product'));
 const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const maximumImageSize = 5 * 1024 * 1024;
@@ -71,13 +76,14 @@ function resetForm(product) {
   form.value = {
     name: product?.name || '',
     price: product?.price ?? '',
-    categoryId: product?.category_id ?? '',
+    categoryId: String(product?.category_id ?? ''),
     stock: product?.stock ?? 0,
     description: product?.description || '',
   };
   selectedImage.value = null;
   imageError.value = '';
   clearImagePreview();
+  if (fileInput.value) fileInput.value.value = '';
 }
 
 function clearImagePreview() {
@@ -199,7 +205,7 @@ onBeforeUnmount(() => {
     >
       <header class="modal-heading">
         <h2 id="product-modal-title">{{ title }}</h2>
-        <p id="product-modal-description">Add product information and stock.</p>
+        <p id="product-modal-description">{{ description }}</p>
       </header>
 
       <form class="product-form" @submit.prevent="submitForm">

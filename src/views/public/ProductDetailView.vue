@@ -196,7 +196,7 @@ onMounted(fetchProduct);
             :disabled="isAdding || isOutOfStock"
             @click="handleAddToCart"
           >
-            {{ isOutOfStock ? 'Stok Habis' : isAdding ? 'Menambahkan…' : 'Add to Cart' }}
+            {{ isOutOfStock ? 'Out of Stock' : isAdding ? 'Adding…' : 'Add to Cart' }}
           </button>
         </section>
       </template>

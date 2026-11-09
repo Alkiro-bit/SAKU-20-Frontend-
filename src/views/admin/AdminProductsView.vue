@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue';
 import AdminSidebar from '@/components/layout/AdminSidebar.vue';
 import AdminHeader from '@/components/layout/AdminHeader.vue';
 import ProductModal from '@/components/modules/ProductModal.vue';
+import DeleteProductModal from '@/components/modules/DeleteProductModal.vue';
 import {
   apiClient,
   getApiErrorMessage,
@@ -18,6 +19,11 @@ const searchQuery = ref('');
 const loading = ref(true);
 const productsError = ref('');
 const modalOpen = ref(false);
+const selectedProduct = ref(null);
+const deleteModalOpen = ref(false);
+const productToDelete = ref(null);
+const deletingProduct = ref(false);
+const productDeleteError = ref('');
 const categoriesLoading = ref(false);
 const categoriesError = ref('');
 const submittingProduct = ref(false);
@@ -149,11 +155,67 @@ async function refreshProducts() {
 }
 
 async function openAddProductModal() {
+  selectedProduct.value = null;
   modalOpen.value = true;
   productSubmitError.value = '';
   productFieldErrors.value = {};
   if (!categories.value.length && !categoriesLoading.value) {
     await loadCategories();
+  }
+}
+
+async function openEditProductModal(product) {
+  selectedProduct.value = product;
+  modalOpen.value = true;
+  productSubmitError.value = '';
+  productFieldErrors.value = {};
+  if (!categories.value.length && !categoriesLoading.value) {
+    await loadCategories();
+  }
+}
+
+function closeProductModal() {
+  modalOpen.value = false;
+  selectedProduct.value = null;
+  productSubmitError.value = '';
+  productFieldErrors.value = {};
+}
+
+function openDeleteProductModal(product) {
+  productToDelete.value = product;
+  productDeleteError.value = '';
+  deleteModalOpen.value = true;
+}
+
+function closeDeleteProductModal() {
+  if (deletingProduct.value) return;
+  deleteModalOpen.value = false;
+  productToDelete.value = null;
+  productDeleteError.value = '';
+}
+
+async function confirmDeleteProduct() {
+  if (deletingProduct.value || !productToDelete.value?.id) return;
+
+  deletingProduct.value = true;
+  productDeleteError.value = '';
+
+  try {
+    await apiClient.delete(`/admin/products/${productToDelete.value.id}`);
+    const deletedProductId = productToDelete.value.id;
+    products.value = products.value.filter((product) => product.id !== deletedProductId);
+    deleteModalOpen.value = false;
+    productToDelete.value = null;
+  } catch (error) {
+    if (error?.response?.status === 409) {
+      productDeleteError.value = 'Produk tidak dapat dihapus karena sudah tercatat dalam riwayat pesanan';
+    } else if (error?.response?.status === 404) {
+      productDeleteError.value = 'Produk tidak ditemukan atau bukan milik toko Anda.';
+    } else {
+      productDeleteError.value = getApiErrorMessage(error, 'Gagal menghapus produk.');
+    }
+  } finally {
+    deletingProduct.value = false;
   }
 }
 
@@ -173,7 +235,7 @@ async function createProduct(product) {
 
   try {
     await apiClient.post('/admin/products', formData);
-    modalOpen.value = false;
+    closeProductModal();
     await refreshProducts();
   } catch (error) {
     productFieldErrors.value = getApiValidationErrors(error);
@@ -181,6 +243,70 @@ async function createProduct(product) {
   } finally {
     submittingProduct.value = false;
   }
+}
+
+async function updateProduct(product) {
+  if (submittingProduct.value) return;
+
+  const currentProduct = selectedProduct.value;
+  if (!currentProduct || currentProduct.id === undefined || currentProduct.id === null) {
+    productSubmitError.value = 'Produk yang akan diperbarui tidak ditemukan.';
+    return;
+  }
+
+  submittingProduct.value = true;
+  productSubmitError.value = '';
+  productFieldErrors.value = {};
+  const formData = new FormData();
+  let hasChanges = false;
+
+  function appendIfChanged(field, value, changed) {
+    if (!changed) return;
+    formData.append(field, String(value));
+    hasChanges = true;
+  }
+
+  appendIfChanged('name', product.name, product.name !== String(currentProduct.name ?? ''));
+  appendIfChanged(
+    'category_id',
+    product.category_id,
+    String(product.category_id) !== String(currentProduct.category_id ?? ''),
+  );
+  appendIfChanged('price', product.price, Number(product.price) !== Number(currentProduct.price));
+  appendIfChanged('stock', product.stock, Number(product.stock) !== Number(currentProduct.stock));
+  appendIfChanged(
+    'description',
+    product.description,
+    product.description !== String(currentProduct.description ?? ''),
+  );
+  if (product.image) {
+    formData.append('image', product.image);
+    hasChanges = true;
+  }
+
+  if (!hasChanges) {
+    closeProductModal();
+    submittingProduct.value = false;
+    return;
+  }
+
+  try {
+    await apiClient.patch(`/admin/products/${currentProduct.id}`, formData);
+    closeProductModal();
+    await refreshProducts();
+  } catch (error) {
+    productFieldErrors.value = getApiValidationErrors(error);
+    productSubmitError.value = getApiErrorMessage(error, 'Gagal memperbarui produk.');
+  } finally {
+    submittingProduct.value = false;
+  }
+}
+
+function submitProduct(product) {
+  if (selectedProduct.value) {
+    return updateProduct(product);
+  }
+  return createProduct(product);
 }
 
 function toggleSidebar() {
@@ -272,9 +398,9 @@ onMounted(loadData);
                 <button
                   type="button"
                   class="edit-button"
-                  disabled
-                  :title="`Edit ${product.name || 'product'} will be available in a future update`"
-                  :aria-label="`Edit ${product.name || 'product'}, available in a future update`"
+                  :title="`Edit ${product.name || 'product'}`"
+                  :aria-label="`Edit ${product.name || 'product'}`"
+                  @click="openEditProductModal(product)"
                 >
                   <Icon icon="mdi:pencil-outline" width="15" height="15" aria-hidden="true" />
                   <span>Edit</span>
@@ -282,9 +408,9 @@ onMounted(loadData);
                 <button
                   type="button"
                   class="delete-button"
-                  disabled
-                  :title="`Delete ${product.name || 'product'} will be available in a future update`"
-                  :aria-label="`Delete ${product.name || 'product'}, available in a future update`"
+                  :title="`Delete ${product.name || 'product'}`"
+                  :aria-label="`Delete ${product.name || 'product'}`"
+                  @click="openDeleteProductModal(product)"
                 >
                   <Icon icon="mdi:delete-outline" width="17" height="17" aria-hidden="true" />
                 </button>
@@ -302,16 +428,26 @@ onMounted(loadData);
 
     <ProductModal
       v-if="modalOpen"
-      mode="create"
+      :mode="selectedProduct ? 'edit' : 'create'"
+      :initial-product="selectedProduct"
       :categories="categories"
       :categories-loading="categoriesLoading"
       :categories-error="categoriesError"
       :submitting="submittingProduct"
       :submit-error="productSubmitError"
       :field-errors="productFieldErrors"
-      @close="modalOpen = false"
-      @submit="createProduct"
+      @close="closeProductModal"
+      @submit="submitProduct"
       @retry-categories="loadCategories"
+    />
+
+    <DeleteProductModal
+      v-if="deleteModalOpen"
+      :product="productToDelete"
+      :deleting="deletingProduct"
+      :error-message="productDeleteError"
+      @close="closeDeleteProductModal"
+      @confirm="confirmDeleteProduct"
     />
   </div>
 </template>
@@ -410,9 +546,14 @@ onMounted(loadData);
   gap: 16px;
 }
 
+.add-product-card,
+.product-card {
+  box-sizing: border-box;
+  height: 290px;
+}
+
 .add-product-card {
   display: flex;
-  min-height: 290px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -539,11 +680,21 @@ onMounted(loadData);
   flex: 1;
 }
 
+.edit-button:hover:not(:disabled) {
+  border-color: #b0b0b0;
+  background-color: #f7f7f7;
+}
+
 .delete-button {
   width: 34px;
   color: var(--color-danger);
   border-color: #efb8b8;
   background-color: #fff1f1;
+}
+
+.delete-button:hover:not(:disabled) {
+  background-color: #ffe5e5;
+  border-color: #ea9999;
 }
 
 .add-product-card:focus-visible,
