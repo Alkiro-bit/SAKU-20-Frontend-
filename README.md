@@ -1,38 +1,104 @@
 # saku20
 
-This template should help get you started developing with Vue 3 in Vite.
+## Title & Badges
 
-## Recommended IDE Setup
+<!-- Add project title and shields here -->
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## Project Description
 
-## Recommended Browser Setup
+A brief overview of what the project does and its purpose.
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+## Main Features
 
-## Customize configuration
+- Feature 1
+- Feature 2
+- Feature 3
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## Tech Stack
 
-## Project Setup
+- **Frontend:** Vue 3, Vite
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS (or your choice)
+- **Testing:** Vitest / Jest (optional)
+
+## Prerequisites
+
+- Node.js >= 18
+- npm or yarn
+- Git
+
+## Installation & Setup
 
 ```sh
+# Clone repository
+git clone <repo-url>
+cd saku20
+
+# Install dependencies
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+## Environment Configuration
+
+Create a `.env` file based on `.env.example` and set required variables (e.g., API_URL).
+
+## Running the Application
 
 ```sh
+# Development server with hot‑reload
 npm run dev
 ```
 
-### Compile and Minify for Production
+## Folder Structure
+
+```
+src/
+  assets/        # Images, fonts, etc.
+  components/    # Vue components
+  router/        # Route definitions
+  store/         # State management (Pinia/Vuex)
+  views/         # Page views
+  App.vue
+  main.ts
+public/          # Static assets
+tests/           # Unit / integration tests
+```
+
+## API Connection (Backend)
+
+The frontend communicates with the backend via REST endpoints defined in `src/services/api.ts`.
+
+## API Endpoints Used
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | `/api/items` | Fetch list of items |
+| POST   | `/api/items` | Create a new item |
+| PUT    | `/api/items/:id` | Update item |
+| DELETE | `/api/items/:id` | Delete item |
+
+*Adjust the table to match your actual endpoints.*
+
+## Screenshots / Demo
+
+<!-- Add GIFs or images showing the UI -->
+
+## Usage Guide
+
+1. Navigate to `http://localhost:5173`.
+2. Use the sidebar to access different sections.
+3. Interact with forms to create / edit data.
+
+## Production Build
 
 ```sh
 npm run build
+# Preview the build locally
+npm run preview
 ```
+
+## License & Author
+
+MIT © Your Name
+
+*Replace placeholders with actual project information.*
