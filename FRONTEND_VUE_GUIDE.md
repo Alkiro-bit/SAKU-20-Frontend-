@@ -237,7 +237,11 @@ Format respons backend konsisten:
 - `GET /admin/reports/finance?from=&to=` → `{ gross, commission, net }`
 
 ### 5.6 Superadmin (`/superadmin/*`)
-- `GET/POST/PATCH/DELETE /superadmin/stores` — **1 endpoint generik** untuk semua field termasuk ganti pemilik toko (`owner_user_id`). Tidak ada endpoint `/owner` terpisah.
+- `GET /superadmin/stores?page=1&per_page=20` → Daftar toko lintas tipe dengan pagination Laravel (`data`, `links`, `meta`). Field tipe adalah `store_type` (`siswa` atau `tefa`), bukan `type`; `owner` dapat `null` atau tidak tersedia.
+- `POST /superadmin/stores` — Body: `{ name, store_type, is_open?, owner_user_id? }`; membuat toko.
+- `PATCH /superadmin/stores/:id` — Body hanya field yang berubah: `{ name?, store_type?, is_open?, owner_user_id? }`. Kirim `owner_user_id: null` untuk melepas pemilik.
+- `DELETE /superadmin/stores/:id` — Menghapus toko permanen (hard delete); periksa dampak ke produk/pesanan terkait sebelum mengonfirmasi.
+- `owner_user_id` hanya dapat menunjuk user ber-role `admin` dan unik untuk satu toko. Pemilik bersifat opsional, termasuk untuk toko yang berstatus terbuka.
 - `GET /superadmin/users?role=&is_active=&search=&page=`
 - `PATCH /superadmin/users/:id/role` — Body: `{ role }`
 - `PATCH /superadmin/users/:id/status` — Body: `{ is_active }`
@@ -423,4 +427,3 @@ onMounted(start);
    - Saat mengembangkan komponen visual, gunakan tool Figma MCP untuk menginspeksi node komponen terkait pada file desain Figma.
    - Ekstrak nilai auto-layout (gap, padding), border-radius, font style, dan ukuran icon langsung dari node Figma.
    - Petakan setiap warna dan token desain dari Figma langsung ke CSS Custom Properties di `tokens.css`, hindari deklarasi hex warna sembarangan.
-
