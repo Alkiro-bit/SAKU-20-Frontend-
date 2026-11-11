@@ -1,5 +1,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+
+onMounted(() => {
+  fetchStores();
+  fetchAdmins();
+});
 import { Icon } from '@iconify/vue';
 import { apiClient, getApiErrorMessage, getApiValidationErrors } from '@/services/api';
 import DeleteStoreModal from '@/components/modules/DeleteStoreModal.vue';
@@ -52,7 +57,14 @@ async function fetchStores(page = currentPage.value) {
       params: { page, per_page: PAGE_SIZE },
     });
     const responseData = res.data || {};
-    stores.value = Array.isArray(responseData.data) ? responseData.data : [];
+    const rawStores = Array.isArray(responseData.data) ? responseData.data : [];
+    // Resolve owner object from admins list if available
+    const enrichedStores = rawStores.map((store) => {
+      const ownerId = store.owner?.id ?? store.owner_user_id;
+      const ownerObj = admins.value.find((admin) => admin.id === ownerId);
+      return { ...store, owner: ownerObj || store.owner };
+    });
+    stores.value = enrichedStores;
     const meta = responseData.meta || {};
     currentPage.value = Number(meta.current_page) || page;
     pagination.value = {
@@ -79,7 +91,7 @@ async function fetchAdmins() {
 
     do {
       const res = await apiClient.get('/superadmin/users', {
-        params: { role: 'admin', page: requestPage, per_page: 100 },
+          params: { role: 'admin', page: requestPage, per_page: 100 },
       });
       const responseData = res.data || {};
       if (Array.isArray(responseData.data)) fetchedAdmins.push(...responseData.data);

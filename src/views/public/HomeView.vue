@@ -38,7 +38,11 @@ onMounted(async () => {
       <!-- Hero Banner -->
       <section class="hero-banner">
         <div class="hero-card">
-          <p class="hero-text">Bagian ini akan diisi hero banner.</p>
+          <img
+            class="hero-image"
+            src="/assets/SAKU%2020%20Food%20Delivery%20Banner.webp"
+            alt="Banner SAKU 20 Food Delivery"
+          />
         </div>
       </section>
 
@@ -95,18 +99,15 @@ onMounted(async () => {
 }
 
 .hero-card {
-  height: 180px;
-  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
   border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--color-primary);
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 12%);
 }
 
-.hero-text {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
+.hero-image {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .section {
